@@ -1002,7 +1002,11 @@ export default function DriverDashboard() {
                               <FaMapMarkerAlt className="text-green-600 mt-1 flex-shrink-0 text-sm sm:text-base" />
                               <div className="min-w-0">
                                 <p className="text-xs sm:text-sm text-gray-600">Start Location</p>
-                                <p className="font-medium text-gray-900 text-sm sm:text-base break-words">{currentTrip.start_location}</p>
+                                <p className="font-medium text-gray-900 text-sm sm:text-base break-words">
+                                  {(currentTrip.start_location === 'Selected Location' || !currentTrip.start_location)
+                                    ? `${currentTrip.origin_lat ? `${parseFloat(currentTrip.origin_lat).toFixed(6)}` : '—'}, ${currentTrip.origin_lng ? `${parseFloat(currentTrip.origin_lng).toFixed(6)}` : '—'}`
+                                    : currentTrip.start_location}
+                                </p>
                               </div>
                             </div>
                             {currentTrip.end_location && (
@@ -1010,7 +1014,11 @@ export default function DriverDashboard() {
                                 <FaMapMarkerAlt className="text-red-600 mt-1 flex-shrink-0 text-sm sm:text-base" />
                                 <div className="min-w-0">
                                   <p className="text-xs sm:text-sm text-gray-600">End Location</p>
-                                  <p className="font-medium text-gray-900 text-sm sm:text-base break-words">{currentTrip.end_location}</p>
+                                  <p className="font-medium text-gray-900 text-sm sm:text-base break-words">
+                                    {(currentTrip.end_location === 'Selected Location' || !currentTrip.end_location)
+                                      ? `${currentTrip.destination_lat ? `${parseFloat(currentTrip.destination_lat).toFixed(6)}` : '—'}, ${currentTrip.destination_lng ? `${parseFloat(currentTrip.destination_lng).toFixed(6)}` : '—'}`
+                                      : currentTrip.end_location}
+                                  </p>
                                 </div>
                               </div>
                             )}

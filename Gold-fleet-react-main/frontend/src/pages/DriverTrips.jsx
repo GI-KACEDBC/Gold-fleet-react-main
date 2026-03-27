@@ -177,7 +177,9 @@ export default function DriverTrips() {
                     <div className="flex-grow">
                       <p className="text-sm text-gray-500 font-medium">From</p>
                       <p className="text-gray-900 font-semibold">
-                        {trip.start_location || 'Current Location'}
+                        {(trip.start_location === 'Selected Location' || !trip.start_location)
+                          ? `${trip.origin_lat ? `${parseFloat(trip.origin_lat).toFixed(6)}` : '—'}, ${trip.origin_lng ? `${parseFloat(trip.origin_lng).toFixed(6)}` : '—'}`
+                          : (trip.start_location || 'Current Location')}
                       </p>
                     </div>
                   </div>
@@ -197,7 +199,9 @@ export default function DriverTrips() {
                     <div className="flex-grow">
                       <p className="text-sm text-gray-500 font-medium">To</p>
                       <p className="text-gray-900 font-semibold">
-                        {trip.end_location || 'Destination'}
+                        {(trip.end_location === 'Selected Location' || !trip.end_location)
+                          ? `${trip.destination_lat ? `${parseFloat(trip.destination_lat).toFixed(6)}` : '—'}, ${trip.destination_lng ? `${parseFloat(trip.destination_lng).toFixed(6)}` : '—'}`
+                          : (trip.end_location || 'Destination')
                       </p>
                     </div>
                   </div>

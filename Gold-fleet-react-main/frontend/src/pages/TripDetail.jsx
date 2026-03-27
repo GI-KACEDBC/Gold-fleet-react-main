@@ -97,11 +97,19 @@ export default function TripDetail() {
           <div className="space-y-4">
             <div>
               <p className="text-sm font-medium text-gray-600">Start Location</p>
-              <p className="text-lg text-gray-900 mt-1">{trip.start_location || 'N/A'}</p>
+              <p className="text-lg text-gray-900 mt-1">
+                {(trip.start_location === 'Selected Location' || !trip.start_location)
+                  ? `${trip.origin_lat ? `${parseFloat(trip.origin_lat).toFixed(6)}` : '—'}, ${trip.origin_lng ? `${parseFloat(trip.origin_lng).toFixed(6)}` : '—'}`
+                  : trip.start_location}
+              </p>
             </div>
             <div>
               <p className="text-sm font-medium text-gray-600">End Location</p>
-              <p className="text-lg text-gray-900 mt-1">{trip.end_location || 'N/A'}</p>
+              <p className="text-lg text-gray-900 mt-1">
+                {(trip.end_location === 'Selected Location' || !trip.end_location)
+                  ? `${trip.destination_lat ? `${parseFloat(trip.destination_lat).toFixed(6)}` : '—'}, ${trip.destination_lng ? `${parseFloat(trip.destination_lng).toFixed(6)}` : '—'}`
+                  : trip.end_location}
+              </p>
             </div>
             <div className="pt-2 border-t border-gray-200">
               <p className="text-sm font-medium text-gray-600">Distance</p>
