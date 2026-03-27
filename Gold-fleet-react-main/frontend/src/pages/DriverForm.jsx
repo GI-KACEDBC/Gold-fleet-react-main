@@ -29,13 +29,19 @@ export default function DriverForm() {
     {
       name: {
         required: 'Driver name is required',
+        minLength: 'Name must be at least 2 characters',
       },
       email: {
         required: 'Email is required',
         email: 'Please enter a valid email address',
       },
+      phone: {
+        phone: true, // Custom phone validation
+      },
       license_number: {
         required: 'License number is required',
+        minLength: 'License number must be at least 5 characters',
+        maxLength: 'License number must be less than 50 characters',
       },
       license_expiry: {
         required: 'License expiry date is required',
@@ -108,6 +114,7 @@ export default function DriverForm() {
     if (!form.isValid) {
       console.log('[DriverForm] Form validation failed, marking all touched');
       form.setAllTouched();
+      setError('Please correct the errors below and try again.');
       return;
     }
 
@@ -183,6 +190,7 @@ export default function DriverForm() {
         value={form.values.name ?? ''}
         onChange={form.handleChange}
         placeholder="John Doe"
+        error={form.errors.name}
         required
       />
       <ModernTextInput
@@ -192,6 +200,7 @@ export default function DriverForm() {
         value={form.values.email ?? ''}
         onChange={form.handleChange}
         placeholder="john@example.com"
+        error={form.errors.email}
         required
       />
       <ModernTextInput
@@ -201,6 +210,7 @@ export default function DriverForm() {
         value={form.values.phone ?? ''}
         onChange={form.handleChange}
         placeholder="(555) 123-4567"
+        error={form.errors.phone}
         required
       />
       <ModernTextInput
@@ -210,6 +220,7 @@ export default function DriverForm() {
         value={form.values.license_number ?? ''}
         onChange={form.handleChange}
         placeholder="DL-12345678"
+        error={form.errors.license_number}
         required
       />
     </FormFieldGroup>
@@ -229,6 +240,7 @@ export default function DriverForm() {
         type="date"
         value={form.values.license_expiry ?? ''}
         onChange={form.handleChange}
+        error={form.errors.license_expiry}
         required
       />
       <ModernSelectInput
@@ -240,6 +252,7 @@ export default function DriverForm() {
           { value: 'active', label: 'Active' },
           { value: 'suspended', label: 'Suspended' }
         ]}
+        error={form.errors.status}
         required
       />
       <ModernTextInput
@@ -249,6 +262,7 @@ export default function DriverForm() {
         value={form.values.address ?? ''}
         onChange={form.handleChange}
         placeholder="123 Main St"
+        error={form.errors.address}
       />
     </FormFieldGroup>
   );

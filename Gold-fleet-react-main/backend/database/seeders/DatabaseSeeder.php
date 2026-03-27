@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
     {
         // Comprehensive dummy data seeder for testing and optimization
         $this->call([
+            PlanSeeder::class,  // Add plans first
             ComprehensiveDummySeeder::class,
             // DriverLoginSeeder::class,  // Uncomment to run driver login seeder
         ]);

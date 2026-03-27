@@ -102,6 +102,7 @@ class PlatformAuthController extends Controller
                 'email' => $validated['admin_email'],
                 'password' => Hash::make($validated['admin_password']),
                 'role' => 'platform_admin',
+                'user_type' => 'platform',
                 'company_id' => $company->id,
                 'email_verified_at' => now(),
             ]);

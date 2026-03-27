@@ -227,7 +227,7 @@ const platformApi = {
   },
 
   /**
-   * Messages
+   * Messages - Complete messaging system
    */
   getMessages: async (page = 1, limit = 10) => {
     const response = await fetch(`${API_BASE_URL}/messages?page=${page}&limit=${limit}`, {
@@ -237,16 +237,81 @@ const platformApi = {
     return response.json();
   },
 
-  sendMessage: async (toUserId, subject, body) => {
+  getMessage: async (messageId) => {
+    const response = await fetch(`${API_BASE_URL}/messages/${messageId}`, {
+      headers: platformApi.getAuthHeader(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch message');
+    return response.json();
+  },
+
+  sendMessage: async (companyId, subject, message, toUserId = null) => {
     const response = await fetch(`${API_BASE_URL}/messages`, {
       method: 'POST',
       headers: {
         ...platformApi.getAuthHeader(),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ to_user_id: toUserId, subject, body }),
+      body: JSON.stringify({ 
+        company_id: companyId, 
+        subject, 
+        message,
+        to_user_id: toUserId 
+      }),
     });
-    if (!response.ok) throw new Error('Failed to send message');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to send message');
+    }
+    return response.json();
+  },
+
+  replyToMessage: async (messageId, message) => {
+    const response = await fetch(`${API_BASE_URL}/messages/${messageId}/reply`, {
+      method: 'POST',
+      headers: {
+        ...platformApi.getAuthHeader(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message }),
+    });
+    if (!response.ok) throw new Error('Failed to send reply');
+    return response.json();
+  },
+
+  markMessageAsRead: async (messageId) => {
+    const response = await fetch(`${API_BASE_URL}/messages/${messageId}/read`, {
+      method: 'PATCH',
+      headers: platformApi.getAuthHeader(),
+    });
+    if (!response.ok) throw new Error('Failed to mark message as read');
+    return response.json();
+  },
+
+  getCompaniesList: async (search = '') => {
+    const query = search ? `?search=${encodeURIComponent(search)}` : '';
+    const url = `${API_BASE_URL}/companies-list${query}`;
+    console.log('Fetching companies from:', url);
+    const response = await fetch(url, {
+      headers: platformApi.getAuthHeader(),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Company list fetch error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData,
+      });
+      throw new Error(errorData.message || `Failed to fetch companies list (${response.status})`);
+    }
+    return response.json();
+  },
+
+  getCompanyAdmins: async (companyId) => {
+    const response = await fetch(`${API_BASE_URL}/company/${companyId}/admins`, {
+      headers: platformApi.getAuthHeader(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch company admins');
     return response.json();
   },
 

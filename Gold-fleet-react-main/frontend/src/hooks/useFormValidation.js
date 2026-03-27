@@ -73,12 +73,46 @@ export const useFormValidation = (initialValues, validationRules = {}) => {
       }
     }
 
-    // Custom validator
-    if (rules.custom && typeof rules.custom === 'function') {
-      return rules.custom(value);
+    // Password confirmation
+    if (rules.confirmPassword) {
+      const passwordField = rules.confirmPassword;
+      const passwordValue = values[passwordField];
+      if (value !== passwordValue) {
+        return 'Passwords do not match';
+      }
     }
 
-    return null;
+    // Pattern validation (regex)
+    if (rules.pattern) {
+      const regex = new RegExp(rules.pattern);
+      if (!regex.test(value)) {
+        return rules.patternMessage || 'Invalid format';
+      }
+    }
+
+    // Phone number validation
+    if (rules.phone) {
+      const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+      if (!phoneRegex.test(value.replace(/[\s\-\(\)]/g, ''))) {
+        return 'Please enter a valid phone number';
+      }
+    }
+
+    // License plate validation (alphanumeric with spaces/dashes)
+    if (rules.licensePlate) {
+      const plateRegex = /^[A-Z0-9\s\-]+$/i;
+      if (!plateRegex.test(value)) {
+        return 'License plate can only contain letters, numbers, spaces, and dashes';
+      }
+    }
+
+    // VIN validation (17 characters, alphanumeric)
+    if (rules.vin) {
+      const vinRegex = /^[A-HJ-NPR-Z0-9]{17}$/i;
+      if (!vinRegex.test(value)) {
+        return 'VIN must be 17 characters (letters and numbers, no I, O, or Q)';
+      }
+    }
   }, [validationRules]);
 
   // Validate all fields

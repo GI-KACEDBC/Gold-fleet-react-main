@@ -136,6 +136,57 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Server error: ' + response.statusText)
       }
 
+      // If driver login fails with 403 (permission denied), try company admin login
+      if (response.status === 403) {
+        console.log('[Auth] Driver login denied (403). Attempting company admin login...')
+        return await loginAsCompanyAdmin(email, password)
+      }
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed')
+      }
+
+      // Only set token if we have valid data
+      if (data.token) {
+        setToken(data.token)
+        setUser(data.user || null)
+        setCompany(data.company || null)
+        sessionStorage.setItem('auth_token', data.token)
+      } else {
+        throw new Error('No token received from server')
+      }
+
+      return data
+    } catch (error) {
+      // Ensure failed login doesn't leave any auth state
+      setToken(null)
+      setUser(null)
+      setCompany(null)
+      sessionStorage.removeItem('auth_token')
+      throw error
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loginAsCompanyAdmin = async (email, password) => {
+    try {
+      const response = await fetch('http://localhost:8000/api/company-admin-login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      })
+
+      let data
+      try {
+        data = await response.json()
+      } catch (e) {
+        console.error('Backend returned non-JSON response:', response.status)
+        throw new Error('Server error: ' + response.statusText)
+      }
+
       if (!response.ok) {
         throw new Error(data.message || 'Login failed')
       }

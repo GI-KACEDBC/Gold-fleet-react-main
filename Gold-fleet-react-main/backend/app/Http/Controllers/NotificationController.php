@@ -37,8 +37,11 @@ class NotificationController extends Controller
                         return [
                             'id' => $notification->id,
                             'type' => $notification->type,
+                            'source_type' => $notification->source_type,
+                            'source_id' => $notification->source_id,
                             'title' => $notification->title,
                             'message' => $notification->message,
+                            'data' => $notification->data,
                             'read' => (bool) $notification->read,
                             'created_at' => $notification->created_at ? $notification->created_at->toIso8601String() : null,
                             'time_ago' => $notification->created_at ? $notification->created_at->diffForHumans() : 'Unknown',

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaBars, FaSearch, FaBell, FaUser, FaSignOutAlt, FaTimes } from 'react-icons/fa';
+import { FaBars, FaSearch, FaBell, FaUser, FaSignOutAlt, FaTimes, FaReply, FaEnvelope } from 'react-icons/fa';
 import platformApi from '../services/platformApi';
+import Toast from '../../components/Toast';
+import { usePlatformMessageNotifications } from '../hooks/usePlatformMessageNotifications';
 
 /**
  * Platform Header - Modern Gold & White Theme
@@ -17,6 +19,15 @@ export default function PlatformHeader({ sidebarOpen, setSidebarOpen, isLarge, s
   const [notifications, setNotifications] = useState([]);
   const [notifLoading, setNotifLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Message notifications
+  const { showToast, newMessageCount, unreadCount: messageUnreadCount, closeToast } = usePlatformMessageNotifications(true);
+
+  // Reply functionality state
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [replying, setReplying] = useState(false);
+  const [currentMessage, setCurrentMessage] = useState(null);
 
   const loadNotifications = async () => {
     setNotifLoading(true);
@@ -42,9 +53,89 @@ export default function PlatformHeader({ sidebarOpen, setSidebarOpen, isLarge, s
     return () => clearInterval(interval);
   }, []);
 
+  // Detect if we're on a message page and load current message
+  useEffect(() => {
+    const path = window.location.pathname;
+    const messageMatch = path.match(/^\/platform\/messages\/(\d+)$/);
+    if (messageMatch) {
+      const messageId = messageMatch[1];
+      // Load the current message for reply functionality
+      const loadCurrentMessage = async () => {
+        try {
+          const res = await fetch(`http://localhost:8000/api/messages/${messageId}`, {
+            headers: platformApi.getAuthHeader(),
+          });
+          if (res.ok) {
+            const message = await res.json();
+            setCurrentMessage(message.data || message);
+          }
+        } catch (err) {
+          console.error('Failed to load current message', err);
+        }
+      };
+      loadCurrentMessage();
+    } else {
+      setCurrentMessage(null);
+    }
+  }, []);
+
   const handleLogout = () => {
     sessionStorage.removeItem('platformToken');
     navigate('/platform/login', { replace: true });
+  };
+
+  const handleNotificationClick = async (notif) => {
+    try {
+      await fetch(`http://localhost:8000/api/notifications/${notif.id}/read`, {
+        method: 'PATCH',
+        headers: platformApi.getAuthHeader(),
+      });
+      setNotificationsOpen(false);
+      await loadNotifications();
+
+      const redirect = notif.data?.redirect_url || (notif.data?.message_id ? `/platform/messages/${notif.data.message_id}` : null);
+      if (redirect) {
+        navigate(redirect);
+      } else {
+        navigate('/platform/messages');
+      }
+    } catch (err) {
+      console.error('Failed to handle notification click', err);
+    }
+  };
+
+  const handleReply = async () => {
+    if (!replyText.trim() || !currentMessage) return;
+
+    setReplying(true);
+    try {
+      const res = await fetch(`http://localhost:8000/api/messages/${currentMessage.id}/reply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...platformApi.getAuthHeader(),
+        },
+        body: JSON.stringify({
+          message: replyText.trim(),
+        }),
+      });
+
+      if (res.ok) {
+        setReplyText('');
+        setReplyOpen(false);
+        setCurrentMessage(null);
+        // Refresh notifications to show new message
+        await loadNotifications();
+        // Navigate to messages to see the reply
+        navigate('/platform/messages');
+      } else {
+        console.error('Failed to send reply');
+      }
+    } catch (err) {
+      console.error('Error sending reply:', err);
+    } finally {
+      setReplying(false);
+    }
   };
 
   const handleSearch = (e) => {
@@ -106,17 +197,19 @@ export default function PlatformHeader({ sidebarOpen, setSidebarOpen, isLarge, s
           {/* Notifications */}
           <div className="relative">
             <button
-              onClick={() => { setNotificationsOpen(!notificationsOpen); setProfileOpen(false); }}
+              onClick={() => { setNotificationsOpen(!notificationsOpen); setProfileOpen(false); closeToast(); }}
               className="relative text-gray-700 hover:text-gray-900 transition-colors p-1.5 hover:bg-gray-100 rounded-lg"
             >
               <FaBell className="w-4 h-4" />
               {unreadCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-yellow-600 rounded-full shadow-md" />
+                <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 bg-yellow-600 text-white text-xs font-bold rounded-full shadow-md text-[10px]">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
               )}
             </button>
 
             {notificationsOpen && (
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-300 z-50 max-h-96 overflow-y-auto">
+              <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-300 z-50 max-h-60 overflow-y-auto">
                 <div className="px-4 py-3 border-b border-gray-300 flex justify-between items-center">
                   <h3 className="font-bold text-gray-900 text-sm">Notifications</h3>
                   <span className="text-xs font-semibold px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full">{unreadCount}</span>
@@ -136,17 +229,7 @@ export default function PlatformHeader({ sidebarOpen, setSidebarOpen, isLarge, s
                       <div
                         key={n.id}
                         className="px-4 py-2 hover:bg-gray-50 cursor-pointer transition-colors"
-                        onClick={async () => {
-                          try {
-                            await fetch(`http://localhost:8000/api/notifications/${n.id}/read`, {
-                              method: 'PATCH',
-                              headers: platformApi.getAuthHeader(),
-                            });
-                            loadNotifications();
-                          } catch (err) {
-                            console.error('Mark read failed', err);
-                          }
-                        }}
+                        onClick={() => handleNotificationClick(n)}
                       >
                         <div className="flex items-start space-x-2">
                           <div className="flex-shrink-0 p-1.5 rounded-full bg-gray-100">
@@ -166,6 +249,34 @@ export default function PlatformHeader({ sidebarOpen, setSidebarOpen, isLarge, s
               </div>
             )}
           </div>
+
+          {/* Messages */}
+          <button
+            onClick={() => {
+              closeToast();
+              navigate('/platform/messages');
+            }}
+            className="relative text-gray-700 hover:text-gray-900 transition-colors p-1.5 hover:bg-gray-100 rounded-lg"
+            title="Messages"
+          >
+            <FaEnvelope className="w-4 h-4" />
+            {messageUnreadCount > 0 && (
+              <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 bg-yellow-600 text-white text-xs font-bold rounded-full shadow-md text-[10px]">
+                {messageUnreadCount > 9 ? '9+' : messageUnreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* Reply Button - Only show when viewing a message */}
+          {currentMessage && (
+            <button
+              onClick={() => setReplyOpen(true)}
+              className="text-gray-700 hover:text-gray-900 transition-colors p-1.5 hover:bg-gray-100 rounded-lg"
+              title="Reply to message"
+            >
+              <FaReply className="w-4 h-4" />
+            </button>
+          )}
 
           {/* Profile Dropdown */}
           <div className="relative">
@@ -213,6 +324,68 @@ export default function PlatformHeader({ sidebarOpen, setSidebarOpen, isLarge, s
           className="fixed inset-0 z-40"
           onClick={() => { setNotificationsOpen(false); setProfileOpen(false); }}
         />
+      )}
+
+      {/* Toast Notification for New Messages */}
+      <Toast 
+        type="gold"
+        count={newMessageCount}
+        onClose={closeToast}
+        duration={5000}
+        show={showToast}
+        positionX="left"
+      />
+
+      {/* Reply Modal */}
+      {replyOpen && currentMessage && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="px-6 py-4 border-b border-gray-300">
+              <h3 className="text-lg font-bold text-gray-900">Reply to Message</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Replying to: <span className="font-medium">{currentMessage.subject || 'Message'}</span>
+              </p>
+            </div>
+            <div className="px-6 py-4">
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-700 line-clamp-3">
+                  {currentMessage.message || currentMessage.content}
+                </p>
+              </div>
+              <textarea
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="Type your reply..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-yellow-500 focus:ring-1 focus:ring-yellow-200 resize-none"
+                rows={4}
+                disabled={replying}
+              />
+            </div>
+            <div className="px-6 py-4 border-t border-gray-300 flex justify-end gap-3">
+              <button
+                onClick={() => { setReplyOpen(false); setReplyText(''); }}
+                className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors"
+                disabled={replying}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReply}
+                disabled={!replyText.trim() || replying}
+                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {replying ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Sending...
+                  </>
+                ) : (
+                  'Send Reply'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </header>
   );

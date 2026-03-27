@@ -69,6 +69,30 @@ export default function InspectionForm() {
     setLoading(true);
     setError('');
 
+    // Validate required fields
+    if (!formData.vehicle_id) {
+      setError('Please select a vehicle');
+      setLoading(false);
+      return;
+    }
+    if (!formData.driver_id) {
+      setError('Please select a driver');
+      setLoading(false);
+      return;
+    }
+    if (!formData.inspection_date) {
+      setError('Please select an inspection date');
+      setLoading(false);
+      return;
+    }
+
+    // Validate date logic
+    if (formData.next_due_date && new Date(formData.next_due_date) <= new Date(formData.inspection_date)) {
+      setError('Next due date must be after the inspection date');
+      setLoading(false);
+      return;
+    }
+
     try {
       if (id) {
         await api.updateInspection(id, formData);

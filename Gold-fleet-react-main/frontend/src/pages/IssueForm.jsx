@@ -74,6 +74,42 @@ export default function IssueForm() {
     setLoading(true);
     setError('');
 
+    // Validate required fields
+    if (!formData.vehicle_id) {
+      setError('Please select a vehicle');
+      setLoading(false);
+      return;
+    }
+    if (!formData.title || formData.title.trim().length === 0) {
+      setError('Please enter a title');
+      setLoading(false);
+      return;
+    }
+    if (!formData.description || formData.description.trim().length === 0) {
+      setError('Please enter a description');
+      setLoading(false);
+      return;
+    }
+    if (!formData.reported_date) {
+      setError('Please select a reported date');
+      setLoading(false);
+      return;
+    }
+
+    // Validate title length
+    if (formData.title.length > 255) {
+      setError('Title cannot exceed 255 characters');
+      setLoading(false);
+      return;
+    }
+
+    // Validate description length
+    if (formData.description.length > 1000) {
+      setError('Description cannot exceed 1000 characters');
+      setLoading(false);
+      return;
+    }
+
     try {
       if (id) {
         await api.updateIssue(id, formData);

@@ -17,7 +17,7 @@ export default function ContactPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:8000/api/messages', {
+      const res = await fetch('http://localhost:8000/api/contact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

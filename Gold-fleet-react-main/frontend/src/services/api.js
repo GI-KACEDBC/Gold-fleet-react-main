@@ -222,6 +222,18 @@ export const api = {
   getPaymentSimulationsBySubscription: (subscriptionId) => apiCall(`${API_BASE_URL}/payment-simulations/subscription/${subscriptionId}`),
   processPaymentSimulation: (id, data) => apiCall(`${API_BASE_URL}/payment-simulations/${id}/process`, { method: 'POST', body: JSON.stringify(data) }),
 
+  // Messages
+  getMessages: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    const url = query ? `${API_BASE_URL}/messages?${query}` : `${API_BASE_URL}/messages`;
+    return apiCall(url);
+  },
+  getMessage: (id) => apiCall(`${API_BASE_URL}/messages/${id}`),
+  sendMessage: (data) => apiCall(`${API_BASE_URL}/messages`, { method: 'POST', body: JSON.stringify(data) }),
+  replyToMessage: (id, data) => apiCall(`${API_BASE_URL}/messages/${id}/reply`, { method: 'POST', body: JSON.stringify(data) }),
+  markMessageAsRead: (id) => apiCall(`${API_BASE_URL}/messages/${id}/read`, { method: 'PATCH' }),
+  deleteMessage: (id) => apiCall(`${API_BASE_URL}/messages/${id}`, { method: 'DELETE' }),
+
   // Geocoding (location services - no auth needed)
   geocode: (location) => apiCall(`${API_BASE_URL}/geocode`, { method: 'POST', body: JSON.stringify({ location }) }),
   reverseGeocode: (lat, lon) => apiCall(`${API_BASE_URL}/reverse-geocode`, { method: 'POST', body: JSON.stringify({ lat, lon }) }),

@@ -66,6 +66,49 @@ export default function ServiceForm() {
     setLoading(true);
     setError('');
 
+    // Validate required fields
+    if (!formData.vehicle_id) {
+      setError('Please select a vehicle');
+      setLoading(false);
+      return;
+    }
+    if (!formData.service_type) {
+      setError('Please select a service type');
+      setLoading(false);
+      return;
+    }
+    if (!formData.service_date) {
+      setError('Please select a service date');
+      setLoading(false);
+      return;
+    }
+    if (formData.cost && (isNaN(parseFloat(formData.cost)) || parseFloat(formData.cost) < 0)) {
+      setError('Cost must be a valid positive number');
+      setLoading(false);
+      return;
+    }
+
+    // Validate cost range
+    if (formData.cost) {
+      const cost = parseFloat(formData.cost);
+      if (cost > 100000) { // Reasonable max for service costs
+        setError('Cost cannot exceed $100,000');
+        setLoading(false);
+        return;
+      }
+    }
+
+    // Validate date logic
+    if (formData.next_service_date && formData.service_date) {
+      const serviceDate = new Date(formData.service_date);
+      const nextServiceDate = new Date(formData.next_service_date);
+      if (nextServiceDate <= serviceDate) {
+        setError('Next service date must be after the service date');
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
       if (id) {
         await api.updateService(id, formData);
@@ -74,7 +117,7 @@ export default function ServiceForm() {
       }
       navigate('/services');
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to save service');
+      setError(err.response?.data?.message || 'Failed to save service');
     } finally {
       setLoading(false);
     }

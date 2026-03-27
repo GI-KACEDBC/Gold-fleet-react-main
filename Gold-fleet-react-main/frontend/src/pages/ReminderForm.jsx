@@ -64,6 +64,44 @@ export default function ReminderForm() {
     setLoading(true);
     setError('');
 
+    // Validate required fields
+    if (!formData.vehicle_id) {
+      setError('Please select a vehicle');
+      setLoading(false);
+      return;
+    }
+    if (!formData.title || formData.title.trim().length === 0) {
+      setError('Please enter a title');
+      setLoading(false);
+      return;
+    }
+    if (!formData.due_date) {
+      setError('Please select a due date');
+      setLoading(false);
+      return;
+    }
+
+    // Validate title length
+    if (formData.title.length > 255) {
+      setError('Title cannot exceed 255 characters');
+      setLoading(false);
+      return;
+    }
+
+    // Validate description length if provided
+    if (formData.description && formData.description.length > 1000) {
+      setError('Description cannot exceed 1000 characters');
+      setLoading(false);
+      return;
+    }
+
+    // Validate due date is not in the past (optional - reminders can be overdue)
+    const today = new Date().toISOString().split('T')[0];
+    if (formData.due_date < today && formData.status === 'pending') {
+      // Allow overdue reminders but warn about them
+      console.warn('Reminder due date is in the past');
+    }
+
     try {
       if (id) {
         await api.updateReminder(id, formData);

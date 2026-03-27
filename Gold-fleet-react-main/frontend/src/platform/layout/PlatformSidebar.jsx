@@ -16,7 +16,6 @@ export default function PlatformSidebar({ isOpen, setIsOpen, isCollapsed, setIsC
     { label: 'Subscriptions', path: '/platform/subscriptions', icon: FaCreditCard },
     { label: 'Payments', path: '/platform/payments', icon: FaCreditCard },
     { label: 'Analytics', path: '/platform/analytics', icon: FaChartBar },
-    { label: 'Messages', path: '/platform/messages', icon: FaEnvelope },
     { label: 'Settings', path: '/platform/settings', icon: FaCog },
   ];
 

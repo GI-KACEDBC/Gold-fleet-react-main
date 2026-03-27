@@ -31,8 +31,8 @@
             <!-- Driver Image -->
             <div class="md:col-span-1">
                 <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                    @if($driver->image)
-                        <img src="{{ asset('storage/' . $driver->image) }}" alt="Driver Photo" class="w-full h-full object-cover">
+                    @if($driver->image_url)
+                        <img src="{{ $driver->image_url }}" alt="Driver Photo" class="w-full h-full object-cover">
                     @else
                         <div class="w-full h-full flex items-center justify-center">
                             <svg class="h-24 w-24 text-gray-400" fill="currentColor" viewBox="0 0 20 20">

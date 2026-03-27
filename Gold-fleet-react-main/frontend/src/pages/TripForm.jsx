@@ -516,6 +516,37 @@ export default function TripForm() {
       setLoading(false);
       return;
     }
+    if (!formData.trip_date) {
+      setError('Please select a trip date');
+      setLoading(false);
+      return;
+    }
+
+    // Validate numeric fields
+    const startMileage = parseFloat(formData.start_mileage);
+    const endMileage = parseFloat(formData.end_mileage);
+    const distance = parseFloat(formData.distance);
+
+    if (formData.start_mileage && (isNaN(startMileage) || startMileage < 0)) {
+      setError('Start mileage must be a valid positive number');
+      setLoading(false);
+      return;
+    }
+    if (formData.end_mileage && (isNaN(endMileage) || endMileage < 0)) {
+      setError('End mileage must be a valid positive number');
+      setLoading(false);
+      return;
+    }
+    if (formData.distance && (isNaN(distance) || distance < 0)) {
+      setError('Distance must be a valid positive number');
+      setLoading(false);
+      return;
+    }
+    if (formData.start_mileage && formData.end_mileage && endMileage < startMileage) {
+      setError('End mileage cannot be less than start mileage');
+      setLoading(false);
+      return;
+    }
 
     try {
       // Format time to Y-m-d\TH:i format (remove seconds if present)

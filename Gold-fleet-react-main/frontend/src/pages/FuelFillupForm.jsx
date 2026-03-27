@@ -69,6 +69,59 @@ export default function FuelFillupForm() {
     setLoading(true);
     setError('');
 
+    // Validate required fields
+    if (!formData.vehicle_id) {
+      setError('Please select a vehicle');
+      setLoading(false);
+      return;
+    }
+    if (!formData.driver_id) {
+      setError('Please select a driver');
+      setLoading(false);
+      return;
+    }
+    if (!formData.gallons || isNaN(parseFloat(formData.gallons)) || parseFloat(formData.gallons) <= 0) {
+      setError('Please enter a valid gallons amount greater than 0');
+      setLoading(false);
+      return;
+    }
+    if (!formData.cost || isNaN(parseFloat(formData.cost)) || parseFloat(formData.cost) <= 0) {
+      setError('Please enter a valid cost greater than 0');
+      setLoading(false);
+      return;
+    }
+    if (!formData.fillup_date) {
+      setError('Please select a fillup date');
+      setLoading(false);
+      return;
+    }
+    if (!formData.odometer_reading || isNaN(parseFloat(formData.odometer_reading)) || parseFloat(formData.odometer_reading) < 0) {
+      setError('Please enter a valid odometer reading');
+      setLoading(false);
+      return;
+    }
+
+    // Validate ranges
+    const gallons = parseFloat(formData.gallons);
+    const cost = parseFloat(formData.cost);
+    const odometer = parseFloat(formData.odometer_reading);
+
+    if (gallons > 1000) { // Reasonable max for fuel capacity
+      setError('Gallons cannot exceed 1,000');
+      setLoading(false);
+      return;
+    }
+    if (cost > 10000) { // Reasonable max for fuel cost
+      setError('Cost cannot exceed $10,000');
+      setLoading(false);
+      return;
+    }
+    if (odometer > 9999999) { // Reasonable max for odometer
+      setError('Odometer reading cannot exceed 9,999,999 km');
+      setLoading(false);
+      return;
+    }
+
     try {
       if (id) {
         await api.updateFuelFillup(id, formData);

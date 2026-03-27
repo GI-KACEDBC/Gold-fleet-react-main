@@ -5,7 +5,8 @@ import { api } from '../services/api';
 import { useFormValidation } from '../hooks/useFormValidation';
 import { compressImage } from '../utils/imageCompression';
 import { ModernFormLayout, ModernTextInput, ModernSelectInput, ModernFileInput, FormFieldGroup } from '../components/ModernFormLayout';
-import { getAllMakes, getModelsByMake } from '../data/vehicleMakesModels';
+import { SearchableSelect } from '../components/SearchableSelect';
+import { useVehicleMakeModel } from '../hooks/useVehicleMakeModel';
 
 export default function VehicleForm() {
   const { id } = useParams();
@@ -15,13 +16,23 @@ export default function VehicleForm() {
   const [preview, setPreview] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   
+  // Use the Make/Model hook for flexible input
+  const {
+    make,
+    model,
+    setMake,
+    setModel,
+    makeOptions,
+    modelOptions,
+    addCustomMake,
+    addCustomModel,
+  } = useVehicleMakeModel('', '');
+  
   const form = useFormValidation(
     {
       name: '',
       license_plate: '',
       type: 'Car',
-      make: '',
-      model: '',
       year: new Date().getFullYear(),
       vin: '',
       status: 'active',
@@ -32,18 +43,28 @@ export default function VehicleForm() {
     {
       name: {
         required: 'Vehicle name is required',
+        minLength: 'Vehicle name must be at least 2 characters',
       },
       license_plate: {
         required: 'License plate is required',
+        licensePlate: true,
+        minLength: 'License plate must be at least 3 characters',
+        maxLength: 'License plate must be less than 20 characters',
       },
       type: {
         required: 'Vehicle type is required',
       },
-      make: {
-        required: 'Make is required',
+      year: {
+        required: 'Year is required',
+        minValue: 1900,
+        maxValue: new Date().getFullYear() + 1,
       },
-      model: {
-        required: 'Model is required',
+      vin: {
+        vin: true,
+      },
+      fuel_capacity: {
+        minValue: 0,
+        maxValue: 1000,
       },
     }
   );
@@ -58,11 +79,23 @@ export default function VehicleForm() {
     try {
       const data = await api.getVehicle(id);
       const vehicle = data.data || data;
-      Object.keys(vehicle).forEach((key) => {
+      
+      // Load form data (excluding make/model which are handled separately)
+      const fieldsToLoad = ['name', 'license_plate', 'type', 'year', 'vin', 'status', 'fuel_capacity', 'fuel_type', 'notes'];
+      fieldsToLoad.forEach((key) => {
         if (form.values.hasOwnProperty(key)) {
           form.setFieldValue(key, vehicle[key] ?? '');
         }
       });
+      
+      // Load make and model separately using the hook
+      if (vehicle.make) {
+        setMake(vehicle.make);
+      }
+      if (vehicle.model) {
+        setModel(vehicle.model);
+      }
+      
       if (vehicle.image_url) {
         setPreview(vehicle.image_url);
       }
@@ -92,9 +125,12 @@ export default function VehicleForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validate form
-    if (!form.isValid) {
+    // Validate form and make/model
+    if (!form.isValid || !make || !model) {
       form.setAllTouched();
+      if (!make) form.setFieldTouched('make');
+      if (!model) form.setFieldTouched('model');
+      setError('Please correct the errors below and try again.');
       return;
     }
 
@@ -109,9 +145,15 @@ export default function VehicleForm() {
 
     try {
       const formData = new FormData();
+      
+      // Add form fields
       Object.keys(form.values).forEach((key) => {
         formData.append(key, form.values[key]);
       });
+      
+      // Add make and model (submitted as simple strings to backend)
+      formData.append('make', make);
+      formData.append('model', model);
 
       if (imageFile) {
         formData.append('image', imageFile);
@@ -149,6 +191,7 @@ export default function VehicleForm() {
         value={form.values.name ?? ''}
         onChange={form.handleChange}
         placeholder="e.g., Work Truck 01"
+        error={form.errors.name}
         required
       />
       <ModernTextInput
@@ -158,6 +201,7 @@ export default function VehicleForm() {
         value={form.values.license_plate ?? ''}
         onChange={form.handleChange}
         placeholder="ABC-1234"
+        error={form.errors.license_plate}
         required
       />
       <ModernSelectInput
@@ -171,30 +215,48 @@ export default function VehicleForm() {
           { value: 'Truck', label: 'Truck' },
           { value: 'Van', label: 'Van' }
         ]}
+        error={form.errors.type}
         required
       />
-      <ModernSelectInput
+      
+      {/* Modern Searchable Make Field */}
+      <SearchableSelect
         label="Make"
-        name="make"
-        value={form.values.make ?? ''}
-        onChange={form.handleChange}
-        options={getAllMakes().map(make => ({ value: make, label: make }))}
+        value={make}
+        onChange={(e) => setMake(e.target.value)}
+        onCustomAdd={addCustomMake}
+        options={makeOptions}
+        placeholder="Search makes or type new..."
+        error={form.errors.make}
         required
+        maxHeight="250px"
+        allowCustom={true}
+        helperText="Select from list or add a new make"
       />
-      <ModernSelectInput
+      
+      {/* Modern Searchable Model Field */}
+      <SearchableSelect
         label="Model"
-        name="model"
-        value={form.values.model ?? ''}
-        onChange={form.handleChange}
-        options={getModelsByMake(form.values.make).map(model => ({ value: model, label: model }))}
+        value={model}
+        onChange={(e) => setModel(e.target.value)}
+        onCustomAdd={addCustomModel}
+        options={modelOptions}
+        placeholder="Search models or type new..."
+        error={form.errors.model}
         required
+        maxHeight="250px"
+        allowCustom={true}
+        helperText={make ? "Select from list or add a custom model" : "Select a make first"}
+        disabled={!make}
       />
+      
       <ModernTextInput
         label="Year"
         name="year"
         type="number"
         value={form.values.year ?? new Date().getFullYear()}
         onChange={form.handleChange}
+        error={form.errors.year}
       />
     </FormFieldGroup>
   );
@@ -214,6 +276,7 @@ export default function VehicleForm() {
         value={form.values.vin ?? ''}
         onChange={form.handleChange}
         placeholder="VIN123456789"
+        error={form.errors.vin}
       />
       <ModernSelectInput
         label="Fuel Type"
@@ -235,6 +298,7 @@ export default function VehicleForm() {
         onChange={form.handleChange}
         placeholder="15.5"
         step="0.1"
+        error={form.errors.fuel_capacity}
       />
       <ModernSelectInput
         label="Status"

@@ -49,6 +49,7 @@ const AuthPage = () => {
     {
       name: {
         required: 'Full name is required',
+        minLength: 'Name must be at least 2 characters',
       },
       email: {
         required: 'Email is required',
@@ -57,16 +58,23 @@ const AuthPage = () => {
       password: {
         required: 'Password is required',
         minLength: 'Password must be at least 8 characters',
+        pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$',
+        patternMessage: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
       },
       password_confirmation: {
         required: 'Please confirm your password',
+        confirmPassword: 'password', // This will check against the password field
       },
       company_name: {
         required: 'Company name is required',
+        minLength: 'Company name must be at least 2 characters',
       },
       company_email: {
         required: 'Company email is required',
         email: 'Please enter a valid company email address',
+      },
+      company_phone: {
+        phone: true, // Custom phone validation
       },
     }
   )

@@ -25,9 +25,9 @@
                 <!-- Driver Image -->
                 <div class="md:col-span-2">
                     <label for="image" class="block text-sm font-medium text-gray-700">Driver Profile Image</label>
-                    @if($driver->image)
+                    @if($driver->image_url)
                         <div class="mt-1 mb-4">
-                            <img src="{{ asset('storage/' . $driver->image) }}" alt="Current Image" class="h-32 w-32 object-cover rounded-lg border">
+                            <img src="{{ $driver->image_url }}" alt="Current Image" class="h-32 w-32 object-cover rounded-lg border">
                         </div>
                     @endif
                     <div class="flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">

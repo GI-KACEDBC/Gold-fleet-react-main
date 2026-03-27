@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { FaSpinner } from 'react-icons/fa';
+import { api } from '../services/api';
+import { useMessageNotifications } from '../hooks/useMessageNotifications';
 
 export default function Header({ sidebarOpen, setSidebarOpen, isLarge, sidebarWidth = 0 }) {
   const navigate = useNavigate();
@@ -9,12 +12,20 @@ export default function Header({ sidebarOpen, setSidebarOpen, isLarge, sidebarWi
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [messagesOpen, setMessagesOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [userName] = useState(user?.name || 'User');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [replying, setReplying] = useState(false);
+  const [currentMessage, setCurrentMessage] = useState(null);
+
+  // Message notifications
+  const { showToast, newMessageCount, unreadCount: messageUnreadCount, closeToast } = useMessageNotifications(!!user);
 
   const handleLogout = async () => {
     await logout();
@@ -57,6 +68,50 @@ export default function Header({ sidebarOpen, setSidebarOpen, isLarge, sidebarWi
     }
   };
 
+  const handleNotificationClick = async (notif) => {
+    try {
+      await markAsRead(notif.id);
+      setNotificationsOpen(false);
+      
+      // Extract message ID from notification data
+      const messageId = notif.data?.message_id || notif.data?.source_id;
+      if (messageId) {
+        // Navigate to message and set it as current for replying
+        navigate(`/messages/${messageId}`);
+        // We'll set currentMessage when the message page loads
+      } else {
+        navigate('/messages');
+      }
+    } catch (error) {
+      console.error('Failed to handle notification click:', error);
+    }
+  };
+
+  const handleReply = async (e) => {
+    e.preventDefault();
+    if (!currentMessage || !replyText.trim()) return;
+
+    setReplying(true);
+    try {
+      await api.replyToMessage(currentMessage.id, {
+        message: replyText,
+      });
+      
+      setReplyText('');
+      setReplyOpen(false);
+      
+      // Refresh notifications
+      loadNotifications();
+      
+      // Navigate back to messages to show updated conversation
+      navigate('/messages');
+    } catch (error) {
+      console.error('Failed to send reply:', error);
+    } finally {
+      setReplying(false);
+    }
+  };
+
   const markAllAsRead = async () => {
     try {
       await fetch('http://localhost:8000/api/notifications/mark-all-read', {
@@ -80,6 +135,30 @@ export default function Header({ sidebarOpen, setSidebarOpen, isLarge, sidebarWi
       return () => clearInterval(interval);
     }
   }, [user]);
+
+  // Detect when on messages page and load current message for replying
+  useEffect(() => {
+    const loadCurrentMessage = async () => {
+      if (location.pathname.startsWith('/messages/')) {
+        const messageId = location.pathname.split('/messages/')[1];
+        if (messageId && messageId !== 'undefined') {
+          try {
+            const response = await api.getMessage(messageId);
+            if (response.success && response.data) {
+              setCurrentMessage(response.data);
+            }
+          } catch (error) {
+            console.error('Failed to load message for reply:', error);
+          }
+        }
+      } else {
+        setCurrentMessage(null);
+        setReplyOpen(false);
+      }
+    };
+
+    loadCurrentMessage();
+  }, [location.pathname]);
 
   const getNotificationIcon = (type) => {
     const iconProps = 'w-4 h-4';
@@ -228,11 +307,75 @@ export default function Header({ sidebarOpen, setSidebarOpen, isLarge, sidebarWi
             </svg>
           </button>
 
+          {/* Messages */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setMessagesOpen(!messagesOpen);
+                setNotificationsOpen(false);
+                setProfileOpen(false);
+              }}
+              className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Messages"
+            >
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              {messageUnreadCount > 0 && (
+                <span className="absolute top-0.5 right-0.5 flex items-center justify-center w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full shadow-md">
+                  {messageUnreadCount > 99 ? '99+' : messageUnreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Messages dropdown */}
+            {messagesOpen && (
+              <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-60 overflow-y-auto">
+                <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                  <h3 className="font-semibold text-gray-900">Messages</h3>
+                  <button
+                    onClick={() => navigate('/messages')}
+                    className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    View All
+                  </button>
+                </div>
+
+                <div className="p-4 text-center text-gray-500 text-sm">
+                  <svg className="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  <p>New message notifications will appear here</p>
+                  <p className="text-xs mt-1">Click "View All" to see your messages</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Reply Button - Only show when on messages page with a message selected */}
+          {currentMessage && (
+            <button
+              onClick={() => {
+                setReplyOpen(!replyOpen);
+                setMessagesOpen(false);
+                setNotificationsOpen(false);
+                setProfileOpen(false);
+              }}
+              className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Reply to message"
+            >
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+              </svg>
+            </button>
+          )}
+
           {/* Notifications */}
           <div className="relative">
             <button
               onClick={() => {
                 setNotificationsOpen(!notificationsOpen);
+                setMessagesOpen(false);
                 setProfileOpen(false);
               }}
               className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -242,13 +385,15 @@ export default function Header({ sidebarOpen, setSidebarOpen, isLarge, sidebarWi
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0018 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                <span className="absolute top-0.5 right-0.5 flex items-center justify-center w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full shadow-md">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
               )}
             </button>
 
             {/* Notifications dropdown */}
             {notificationsOpen && (
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-y-auto">
+              <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-60 overflow-y-auto">
                 <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center">
                   <h3 className="font-semibold text-gray-900">Notifications</h3>
                   {unreadCount > 0 && (
@@ -278,7 +423,7 @@ export default function Header({ sidebarOpen, setSidebarOpen, isLarge, sidebarWi
                         className={`px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors ${
                           !notif.read ? 'bg-blue-50' : ''
                         }`}
-                        onClick={() => markAsRead(notif.id)}
+                        onClick={() => handleNotificationClick(notif)}
                       >
                         <div className="flex items-start space-x-3">
                           <div className={`flex-shrink-0 p-2 rounded-full ${getBgColorClass(notif.type)}`}>
@@ -296,6 +441,58 @@ export default function Header({ sidebarOpen, setSidebarOpen, isLarge, sidebarWi
               </div>
             )}
           </div>
+
+          {/* Reply Modal */}
+          {replyOpen && currentMessage && (
+            <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+              <div className="px-4 py-3 border-b border-gray-200">
+                <h3 className="font-semibold text-gray-900">Reply to Message</h3>
+                <p className="text-xs text-gray-600 mt-1">
+                  Replying to: <span className="font-medium">{currentMessage.subject}</span>
+                </p>
+              </div>
+
+              <form onSubmit={handleReply} className="p-4 space-y-4">
+                <div>
+                  <textarea
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    placeholder="Type your reply..."
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent resize-none"
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={replying || !replyText.trim()}
+                    className="flex-1 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white font-medium rounded-lg shadow-sm hover:shadow-md active:scale-95 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {replying ? (
+                      <>
+                        <FaSpinner className="animate-spin text-xs" />
+                        Sending...
+                      </>
+                    ) : (
+                      'Send Reply'
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReplyOpen(false);
+                      setReplyText('');
+                    }}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-all text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
 
           {/* Settings */}
           <div className="relative">
@@ -411,10 +608,24 @@ export default function Header({ sidebarOpen, setSidebarOpen, isLarge, sidebarWi
       )}
 
       {/* Backdrop for dropdowns */}
-      {(notificationsOpen || profileOpen || settingsOpen) && (
+      {(messagesOpen || notificationsOpen || profileOpen || settingsOpen) && (
         <div
           className="fixed inset-0 z-40"
           onClick={() => {
+            setMessagesOpen(false);
+            setNotificationsOpen(false);
+            setProfileOpen(false);
+            setSettingsOpen(false);
+          }}
+        />
+      )}
+
+      {/* Backdrop for dropdowns */}
+      {(messagesOpen || notificationsOpen || profileOpen || settingsOpen) && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => {
+            setMessagesOpen(false);
             setNotificationsOpen(false);
             setProfileOpen(false);
             setSettingsOpen(false);

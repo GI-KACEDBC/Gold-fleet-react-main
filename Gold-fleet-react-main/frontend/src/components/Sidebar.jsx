@@ -56,6 +56,9 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, sidebarCollapsed,
       'Map Dashboard': (
         <svg className={iconProps} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5-2V7l5 2 5-2 5 2v11l-5-2-5 2z" /></svg>
       ),
+      'Messages': (
+        <svg className={iconProps} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+      ),
       'Vehicles': (
         <svg className={iconProps} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 13l1-7h16l1 7M5 13v6m14-6v6M7 19h.01M17 19h.01" /></svg>
       ),

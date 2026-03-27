@@ -62,6 +62,35 @@ export default function ExpenseForm() {
     setLoading(true);
     setError('');
 
+    // Validate required fields
+    if (!formData.vehicle_id) {
+      setError('Please select a vehicle');
+      setLoading(false);
+      return;
+    }
+    if (!formData.category) {
+      setError('Please select a category');
+      setLoading(false);
+      return;
+    }
+    if (!formData.amount || isNaN(parseFloat(formData.amount)) || parseFloat(formData.amount) <= 0) {
+      setError('Please enter a valid amount greater than 0');
+      setLoading(false);
+      return;
+    }
+    if (!formData.expense_date) {
+      setError('Please select an expense date');
+      setLoading(false);
+      return;
+    }
+
+    // Validate amount format and range
+    const amount = parseFloat(formData.amount);
+    if (amount > 1000000) { // Reasonable max for expenses
+      setError('Amount cannot exceed $1,000,000');
+      setLoading(false);
+      return;
+    }
     try {
       if (id) {
         await api.updateExpense(id, formData);
@@ -75,7 +104,6 @@ export default function ExpenseForm() {
       setLoading(false);
     }
   };
-
   const categoryOptions = [
     { value: '', label: 'Select category' },
     { value: 'fuel', label: 'Fuel' },

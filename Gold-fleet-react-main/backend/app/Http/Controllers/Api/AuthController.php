@@ -14,6 +14,8 @@ class AuthController extends Controller
 {
     /**
      * Handle user login and return API token.
+     * ONLY allows drivers to login via this endpoint.
+     * Company admins and platform admins must use their separate login endpoints.
      */
     public function login(Request $request): JsonResponse
     {
@@ -29,6 +31,14 @@ class AuthController extends Controller
                 'success' => false,
                 'message' => 'Invalid credentials',
             ], 401);
+        }
+
+        // Prevent company admins and platform admins from logging in via this endpoint
+        if (!in_array($user->role, ['driver'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This login method is for drivers only. Please use the appropriate admin login portal.',
+            ], 403);
         }
 
         // Email verification requirement removed - allow login immediately
@@ -379,5 +389,61 @@ class AuthController extends Controller
                 'message' => 'Account activation failed: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Handle company admin login.
+     * ONLY allows company admins (role='admin') to login via this endpoint.
+     * This is a separate endpoint from the driver login (/api/login).
+     */
+    public function companyAdminLogin(Request $request): JsonResponse
+    {
+        $credentials = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required'],
+        ]);
+
+        $user = User::where('email', $credentials['email'])->first();
+
+        if (!$user || !Hash::check($credentials['password'], $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid credentials',
+            ], 401);
+        }
+
+        // Only allow company admins (role='admin') with a company_id
+        if ($user->role !== 'admin' || !$user->company_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This login method is for company admins only. Please use the driver or platform login.',
+            ], 403);
+        }
+
+        // Generate API token
+        $token = \Illuminate\Support\Str::random(80);
+        $user->update(['api_token' => $token]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Logged in successfully',
+            'token' => $token,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'company_id' => $user->company_id,
+                'account_status' => $user->account_status,
+                'email_verified' => $user->hasVerifiedEmail(),
+            ],
+            'company' => $user->company ? [
+                'id' => $user->company->id,
+                'name' => $user->company->name,
+                'account_status' => $user->company->account_status,
+                'company_status' => $user->company->company_status,
+                'subscription_status' => $user->company->subscription_status,
+            ] : null,
+        ]);
     }
 }

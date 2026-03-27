@@ -8,7 +8,10 @@ use App\Http\Controllers\Api\PlatformDashboardController;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\CompanyApprovalController;
 use App\Http\Controllers\Api\PlatformStatusController;
+use App\Http\Controllers\Api\PlatformMessageController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\GenericController;
+use App\Http\Controllers\MessageController;
 use App\Http\Controllers\MapDashboardController;
 use App\Http\Controllers\InfoDashboardController;
 use App\Http\Controllers\VehicleController;
@@ -40,13 +43,14 @@ use App\Http\Controllers\GeocodingController;
 
 // Auth routes (public)
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/company-admin-login', [AuthController::class, 'companyAdminLogin']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/driver-register', [AuthController::class, 'driverRegister']);
 Route::post('/driver-activate', [AuthController::class, 'driverActivate']);
 Route::post('/cancel-signup', [AuthController::class, 'cancelSignup']);
 
 // Public contact endpoint for inbound messages
-Route::post('/messages', [ContactController::class, 'store']);
+Route::post('/contact', [ContactController::class, 'store']);
 
 // Public endpoint to record map clicks
 Route::post('/map-clicks', [MapClickController::class, 'store']);
@@ -78,7 +82,18 @@ Route::prefix('platform')->group(function () {
         Route::get('/analytics/trips-per-company', [PlatformDashboardController::class, 'getTripsPerCompany']);
         Route::get('/analytics/subscription-revenue', [PlatformDashboardController::class, 'getSubscriptionRevenue']);
         Route::get('/subscriptions', [PlatformDashboardController::class, 'getSubscriptions']);
-        Route::get('/messages', [PlatformDashboardController::class, 'getMessages']);
+        
+        // Platform Messaging endpoints (new real-time messaging system)
+        Route::get('/messages', [PlatformMessageController::class, 'index']);
+        Route::post('/messages', [PlatformMessageController::class, 'store']);
+        Route::get('/messages/{message}', [PlatformMessageController::class, 'show']);
+        Route::post('/messages/{message}/reply', [PlatformMessageController::class, 'reply']);
+        Route::patch('/messages/{message}/read', [PlatformMessageController::class, 'markAsRead']);
+        
+        // Company and Admin lists for messaging
+        Route::get('/companies-list', [PlatformMessageController::class, 'getCompaniesList']);
+        Route::get('/company/{companyId}/admins', [PlatformMessageController::class, 'getCompanyAdmins']);
+        
         Route::get('/settings', [PlatformDashboardController::class, 'getSettings']);
         Route::post('/settings', [PlatformDashboardController::class, 'updateSettings']);
         
@@ -206,6 +221,15 @@ Route::middleware('authorize.api.token')->group(function () {
     Route::post('/inspections/submit-checklist', [InspectionController::class, 'submitChecklist']);
     Route::get('/inspections/pending-reviews', [InspectionController::class, 'getPendingReviews']);
     Route::patch('/inspections/{inspection}/review', [InspectionController::class, 'reviewChecklist']);
+
+    // ========== COMPANY MESSAGING ROUTES (NO APPROVAL REQUIRED) ==========
+    // Company users can send messages to platform regardless of approval status
+    Route::get('/messages', [MessageController::class, 'index']);
+    Route::post('/messages', [MessageController::class, 'store']);
+    Route::get('/messages/{message}', [MessageController::class, 'show']);
+    Route::post('/messages/{message}/reply', [MessageController::class, 'reply']);
+    Route::patch('/messages/{message}/read', [MessageController::class, 'markAsRead']);
+    Route::delete('/messages/{message}', [MessageController::class, 'destroy']);
 
     // ========== FLEET MANAGEMENT ROUTES - REQUIRE COMPANY APPROVAL ==========
     // These routes are protected by EnsureCompanyApproved middleware

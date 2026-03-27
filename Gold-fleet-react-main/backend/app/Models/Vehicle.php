@@ -90,6 +90,25 @@ class Vehicle extends Model
 
     public function getImageUrlAttribute()
     {
-        return $this->image ? asset('storage/' . $this->image) : null;
+        if (!$this->image) {
+            return null;
+        }
+
+        $storagePath = 'storage/' . $this->image;
+
+        // Check if the storage symlink exists and file is accessible
+        if (file_exists(public_path($storagePath))) {
+            return asset($storagePath);
+        }
+
+        // Fallback: try direct storage path (if symlink failed)
+        $directPath = 'storage/app/public/' . $this->image;
+        if (file_exists(storage_path('app/public/' . $this->image))) {
+            // This won't work via web without a route, so return null with warning
+            \Log::warning("Image file exists but storage symlink is missing for vehicle {$this->id}: {$this->image}");
+            return null; // Or return a placeholder image URL
+        }
+
+        return null;
     }
 }

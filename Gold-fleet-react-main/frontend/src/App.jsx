@@ -52,6 +52,7 @@ import ReminderForm from './pages/ReminderForm';
 import ReminderDetail from './pages/ReminderDetail';
 import Profile from './pages/Profile';
 import Notifications from './pages/Notifications';
+import MessagingPage from './pages/MessagingPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import CompanySettingsPage from './pages/CompanySettingsPage';
 import PlatformRouter from './platform/routes/PlatformRouter';
@@ -174,6 +175,8 @@ function AppRoutes() {
       <Route path="/profile" element={<ProtectedLayout><Profile /></ProtectedLayout>} />
       <Route path="/change-password" element={<ProtectedLayout><ChangePasswordPage /></ProtectedLayout>} />
       <Route path="/company-settings" element={<ProtectedLayout><CompanySettingsPage /></ProtectedLayout>} />
+      <Route path="/messages" element={<ProtectedLayout><MessagingPage /></ProtectedLayout>} />
+      <Route path="/messages/:id" element={<ProtectedLayout><MessagingPage /></ProtectedLayout>} />
       <Route path="/notifications" element={<ProtectedLayout><Notifications /></ProtectedLayout>} />
 
       {/* Platform Owner Panel - /platform/* routes - MUST be before catch-all but after specific routes */}
