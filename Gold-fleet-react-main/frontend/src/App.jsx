@@ -37,6 +37,7 @@ import Inspections from './pages/Inspections';
 import InspectionForm from './pages/InspectionForm';
 import InspectionDetail from './pages/InspectionDetail';
 import DriverMaintenanceChecklist from './pages/DriverMaintenanceChecklist';
+import DriverMessaging from './pages/DriverMessaging';
 import AdminInspectionReports from './pages/AdminInspectionReports';
 import Issues from './pages/Issues';
 import IssueForm from './pages/IssueForm';
@@ -113,6 +114,7 @@ function AppRoutes() {
       <Route path="/driver-dashboard" element={<ProtectedDriverRoute><DriverLayout><DriverDashboard /></DriverLayout></ProtectedDriverRoute>} />
       <Route path="/driver/dashboard" element={<ProtectedDriverRoute><DriverLayout><DriverDashboard /></DriverLayout></ProtectedDriverRoute>} />
       <Route path="/driver/maintenance" element={<ProtectedDriverRoute><DriverLayout><DriverMaintenanceChecklist /></DriverLayout></ProtectedDriverRoute>} />
+      <Route path="/driver/messages" element={<ProtectedDriverRoute><DriverLayout><DriverMessaging /></DriverLayout></ProtectedDriverRoute>} />
       <Route path="/map" element={<ProtectedRoute><ApprovalGuard><Layout><MapDashboard /></Layout></ApprovalGuard></ProtectedRoute>} />
       <Route path="/info" element={<ProtectedRoute><ApprovalGuard><Layout><InfoDashboard /></Layout></ApprovalGuard></ProtectedRoute>} />
       

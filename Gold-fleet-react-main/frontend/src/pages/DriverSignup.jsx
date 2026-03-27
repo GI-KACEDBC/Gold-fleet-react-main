@@ -101,11 +101,13 @@ const DriverSignup = () => {
         throw new Error(data.message || 'Registration failed')
       }
 
-      setSuccess('Registration successful! Logging you in...')
+      setSuccess('Registration successful! Redirecting to login page...')
       
-      // Log in automatically
+      // Redirect to login page - user must log in with their credentials
+      // Clear any temporary token that may have been created
       setTimeout(() => {
-        navigate('/driver', { replace: true })
+        sessionStorage.removeItem('auth_token')
+        navigate('/auth', { replace: true })
       }, 1500)
     } catch (err) {
       setError(err.message || 'Registration failed. Please try again.')

@@ -1,7 +1,7 @@
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
-import { FaSignOutAlt, FaClipboardCheck, FaHome } from 'react-icons/fa';
+import { FaSignOutAlt, FaClipboardCheck, FaHome, FaEnvelope } from 'react-icons/fa';
 
 export default function DriverLayout({ children }) {
   const { user, logout } = useAuth();
@@ -41,6 +41,12 @@ export default function DriverLayout({ children }) {
                 className="flex items-center gap-2 text-gray-700 hover:text-yellow-600 font-medium transition"
               >
                 <FaClipboardCheck /> Maintenance
+              </button>
+              <button
+                onClick={() => navigate('/driver/messages')}
+                className="flex items-center gap-2 text-gray-700 hover:text-yellow-600 font-medium transition"
+              >
+                <FaEnvelope /> Messages
               </button>
             </nav>
           </div>

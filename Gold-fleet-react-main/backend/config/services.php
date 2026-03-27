@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'mapbox' => [
+        'secret' => env('MAPBOX_API_KEY'),
+    ],
+
 ];

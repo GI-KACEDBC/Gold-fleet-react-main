@@ -269,4 +269,47 @@ class DriverController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Regenerate setup link for a driver
+     */
+    public function regenerateSetupLink(Driver $driver)
+    {
+        try {
+            // Ensure driver belongs to user's company
+            if ($driver->company_id !== auth()->user()->company_id) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            // Admin-only access
+            if (auth()->user()->role !== 'admin') {
+                return response()->json(['error' => 'Only admins can regenerate setup links'], 403);
+            }
+
+            // Generate new setup token
+            $newToken = \Illuminate\Support\Str::random(32);
+            
+            // Update driver with new token
+            $driver->update(['setup_token' => $newToken]);
+
+            // Generate setup link
+            $setupLink = config('app.frontend_url') . '/driver-setup/' . $newToken;
+
+            return response()->json([
+                'success' => true,
+                'setup_link' => $setupLink,
+                'message' => 'New setup link generated successfully',
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Driver regenerate setup link error: ' . $e->getMessage(), [
+                'user_id' => auth()->id(),
+                'driver_id' => $driver->id,
+                'exception' => $e,
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to regenerate setup link: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }

@@ -8,6 +8,9 @@ export default function DriverDetail() {
   const [driver, setDriver] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [setupLink, setSetupLink] = useState(null);
+  const [showSetupLink, setShowSetupLink] = useState(false);
+  const [linkLoading, setLinkLoading] = useState(false);
 
   useEffect(() => {
     loadDriver();
@@ -33,6 +36,24 @@ export default function DriverDetail() {
         setError('Failed to delete driver: ' + err.message);
       }
     }
+  };
+
+  const handleRegenerateSetupLink = async () => {
+    setLinkLoading(true);
+    try {
+      const response = await api.regenerateDriverSetupLink(id);
+      setSetupLink(response.setup_link);
+      setShowSetupLink(true);
+    } catch (err) {
+      setError('Failed to regenerate setup link: ' + err.message);
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
+  const copyLinkToClipboard = () => {
+    navigator.clipboard.writeText(setupLink);
+    alert('Setup link copied to clipboard!');
   };
 
   if (loading) {
@@ -66,6 +87,14 @@ export default function DriverDetail() {
           >
             Back
           </button>
+          <button
+            onClick={handleRegenerateSetupLink}
+            disabled={linkLoading}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
+            title="Generate a new password setup link for this driver"
+          >
+            {linkLoading ? 'Generating...' : 'Get Setup Link'}
+          </button>
           <Link
             to={`/drivers/${id}/edit`}
             className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors font-medium text-center"
@@ -87,6 +116,34 @@ export default function DriverDetail() {
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
           </svg>
           {error}
+        </div>
+      )}
+
+      {showSetupLink && setupLink && (
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-blue-900 mb-2">Setup Link for Password Configuration</h3>
+              <p className="text-sm text-blue-800 mb-3">Share this link with the driver so they can set up their password:</p>
+              <div className="flex gap-2">
+                <div className="flex-1 bg-white rounded-lg px-4 py-3 border border-blue-300 overflow-x-auto">
+                  <code className="text-sm text-gray-900 font-mono break-all">{setupLink}</code>
+                </div>
+                <button
+                  onClick={copyLinkToClipboard}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium whitespace-nowrap"
+                >
+                  Copy Link
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowSetupLink(false)}
+              className="text-blue-600 hover:text-blue-900 ml-4 font-bold"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       )}
 

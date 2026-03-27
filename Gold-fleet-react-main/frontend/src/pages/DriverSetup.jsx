@@ -91,10 +91,9 @@ export default function DriverSetup() {
       if (response && response.user) {
         setSuccess(true);
         
-        // Auto-login with returned credentials
+        // Store token in sessionStorage with correct key for consistency with AuthContext
         if (response.token) {
-          localStorage.setItem('authToken', response.token);
-          localStorage.setItem('user', JSON.stringify(response.user));
+          sessionStorage.setItem('auth_token', response.token);
           
           // Redirect to driver dashboard after short delay
           setTimeout(() => {

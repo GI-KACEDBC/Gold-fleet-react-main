@@ -50,6 +50,10 @@ class TripController extends Controller
                 'distance' => 'nullable|numeric|min:0',
                 'trip_date' => 'required|date',
                 'status' => 'nullable|in:planned,in_progress,active,completed,cancelled',
+                'origin_lat' => 'nullable|numeric',
+                'origin_lng' => 'nullable|numeric',
+                'destination_lat' => 'nullable|numeric',
+                'destination_lng' => 'nullable|numeric',
             ]);
 
             $validated['company_id'] = auth()->user()->company_id ?? 1;
@@ -118,6 +122,10 @@ class TripController extends Controller
                 'distance' => 'nullable|numeric|min:0',
                 'trip_date' => 'required|date',
                 'status' => 'nullable|in:planned,in_progress,active,completed,cancelled',
+                'origin_lat' => 'nullable|numeric',
+                'origin_lng' => 'nullable|numeric',
+                'destination_lat' => 'nullable|numeric',
+                'destination_lng' => 'nullable|numeric',
             ]);
 
             $trip->update($validated);

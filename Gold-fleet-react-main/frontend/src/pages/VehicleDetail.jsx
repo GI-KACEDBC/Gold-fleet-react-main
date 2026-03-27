@@ -35,6 +35,14 @@ export default function VehicleDetail() {
     }
   };
 
+  const canTrackVehicle = (vehicle) => {
+    return vehicle.status === 'active' && (vehicle.assigned_driver_id || vehicle.driver);
+  };
+
+  const handleCheckLocation = () => {
+    navigate(`/map?vehicleId=${vehicle.id}`);
+  };
+
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow p-6">
@@ -66,6 +74,18 @@ export default function VehicleDetail() {
           >
             Back
           </button>
+          <button
+            onClick={handleCheckLocation}
+            disabled={!canTrackVehicle(vehicle)}
+            className={`px-4 py-2 border border-gray-300 rounded-lg transition-colors font-medium ${
+              canTrackVehicle(vehicle)
+                ? 'text-green-600 hover:text-green-900 hover:bg-green-50'
+                : 'text-gray-400 cursor-not-allowed'
+            }`}
+            title={canTrackVehicle(vehicle) ? 'View vehicle location' : 'Vehicle must be active and assigned to a driver'}
+          >
+            Track
+          </button>
           <Link
             to={`/vehicles/${id}/edit`}
             className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors font-medium text-center"
@@ -94,12 +114,12 @@ export default function VehicleDetail() {
         {/* Image Section */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border border-gray-200 overflow-hidden">
-            <div className="relative w-full" style={{ paddingTop: '75%' }}>
+            <div className="relative w-full bg-gray-100" style={{ paddingTop: '56.25%' }}>
               {vehicle.image_url ? (
                 <img
                   src={vehicle.image_url}
                   alt={`${vehicle.make} ${vehicle.model}`}
-                  className="absolute inset-0 w-full h-full object-cover object-bottom"
+                  className="absolute inset-0 w-full h-full object-contain"
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-gray-500 bg-gradient-to-br from-gray-50 to-gray-100">

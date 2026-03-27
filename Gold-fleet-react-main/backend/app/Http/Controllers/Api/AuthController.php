@@ -16,6 +16,8 @@ class AuthController extends Controller
      * Handle user login and return API token.
      * ONLY allows drivers to login via this endpoint.
      * Company admins and platform admins must use their separate login endpoints.
+     * 
+     * NOTE: Email verification is required before login.
      */
     public function login(Request $request): JsonResponse
     {
@@ -41,11 +43,45 @@ class AuthController extends Controller
             ], 403);
         }
 
-        // Email verification requirement removed - allow login immediately
+        // ========== EMAIL VERIFICATION REQUIRED ==========
+        // Check if user's email is verified
+        if (!$user->hasVerifiedEmail()) {
+            \Illuminate\Support\Facades\Log::warning('Login attempt with unverified email', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'ip_address' => $request->ip(),
+                'timestamp' => now(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Please verify your email before logging in',
+                'code' => 'EMAIL_NOT_VERIFIED',
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'action_required' => 'email_verification',
+                'verification_link' => 'Check storage logs for verification link or use API endpoint',
+                'api_endpoint' => '/api/dev/email/user/' . $user->id . '/status',
+                'instructions' => [
+                    '1. Option A: Use API to get verification link: GET /api/dev/email/user/' . $user->id . '/status',
+                    '2. Option B: Check laravel.log for "CLICK LINK TO VERIFY EMAIL" marker',
+                    '3. Option C: Force verify in development: POST /api/dev/email/user/' . $user->id . '/force-verify',
+                    '4. Then click the link or use the verify endpoint',
+                ],
+            ], 401);
+        }
 
         // Generate a simple token (use Str::random(80) or a more robust method in production)
         $token = \Illuminate\Support\Str::random(80);
         $user->update(['api_token' => $token]);
+        
+        \Illuminate\Support\Facades\Log::info('User login successful', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'email_verified' => true,
+            'ip_address' => $request->ip(),
+            'timestamp' => now(),
+        ]);
 
         return response()->json([
             'success' => true,
@@ -381,6 +417,11 @@ class AuthController extends Controller
                     'email' => $user->email,
                     'role' => 'driver',
                     'company_id' => $user->company_id,
+                ],
+                'driver' => [
+                    'id' => $driver->id,
+                    'company_id' => $driver->company_id,
+                    'status' => $driver->status,
                 ],
             ], 200);
         } catch (\Exception $e) {

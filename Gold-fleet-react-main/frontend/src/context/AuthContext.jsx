@@ -244,7 +244,8 @@ export const AuthProvider = ({ children }) => {
         throw new Error(data.message || 'Signup failed')
       }
 
-      // Store token from registration so user can continue with subscription setup
+      // Store token temporarily for subscription setup during signup flow.
+      // The token will be cleared on login page before user authenticates.
       if (data.token) {
         setToken(data.token)
         setUser(data.user || null)

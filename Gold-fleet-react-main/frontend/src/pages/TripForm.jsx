@@ -55,83 +55,171 @@ function LocationPicker({ label, value, location, onLocationChange, onCoordinate
   const [searchQuery, setSearchQuery] = useState(value);
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
   const [tempMarker, setTempMarker] = useState(null);
+  const [mapCenter, setMapCenter] = useState([5.6037, -0.1870]); // Ghana center by default
   const mapRef = useRef(null);
   const searchResultsRef = useRef(null);
-
-  // Sync searchQuery with value prop when it changes
-  useEffect(() => {
-    setSearchQuery(value || '');
-  }, [value]);
+  const dropdownRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const debounceTimerRef = useRef(null);
 
   // Close suggestions when clicking outside
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (searchResultsRef.current && !searchResultsRef.current.contains(e.target)) {
-        setSearchResults([]);
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target) && 
+          searchInputRef.current && !searchInputRef.current.contains(e.target)) {
+        setShowDropdown(false);
       }
     };
 
-    if (searchResults.length > 0) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [searchResults]);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-  // Force map to render when showMap changes or location changes
+  // Force map to render when showMap changes
   useEffect(() => {
     if (showMap) {
       // Delay to ensure DOM is updated
       const timer = setTimeout(() => {
         // Trigger map resize if it exists
-        const mapElement = document.querySelector('.leaflet-container');
+        const mapElement = document.querySelector(`[data-map-id="${label}"]`)?.querySelector('.leaflet-container');
         if (mapElement && mapElement._leaflet_map) {
           mapElement._leaflet_map.invalidateSize();
-          // If location exists, center on it with zoom 15, otherwise use default
-          if (location && location.lat) {
-            mapElement._leaflet_map.setView(
-              [parseFloat(location.lat), parseFloat(location.lon)], 
-              15
-            );
-          }
+          // Center on the map center state
+          mapElement._leaflet_map.setView([mapCenter[0], mapCenter[1]], 13);
         }
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [showMap, location]);
+  }, [showMap, mapCenter, label]);
 
-  const handleSearch = async (query) => {
-    setSearchQuery(query);
-    
+  // Common Ghana locations for fallback
+  const GHANA_LOCATIONS = [
+    { name: 'Accra', lat: 5.6037, lon: -0.1870, type: 'city' },
+    { name: 'Kumasi', lat: 6.6924, lon: -1.6243, type: 'city' },
+    { name: 'Tema', lat: 5.7152, lon: -0.0145, type: 'city' },
+    { name: 'Sekondi-Takoradi', lat: 4.9265, lon: -1.7554, type: 'city' },
+    { name: 'Cape Coast', lat: 5.1030, lon: -1.2457, type: 'city' },
+    { name: 'Tamale', lat: 9.4077, lon: -0.8789, type: 'city' },
+  ];
+
+  // Perform actual search with Mapbox as primary, GHANA_LOCATIONS as fallback
+  const performSearch = async (query) => {
     if (!query.trim()) {
       setSearchResults([]);
-      // Clear location when search is cleared
+      setShowDropdown(false);
       onLocationChange('');
       onCoordinatesChange(null);
       return;
     }
 
+    setShowDropdown(true);
     setSearching(true);
+    setSearchResults([]);
+    
     try {
-      const response = await api.geocode(query);
-      console.log('Geocode response:', response);
+      let results = [];
       
-      if (response.success && response.data && Array.isArray(response.data)) {
-        setSearchResults(response.data);
-      } else if (Array.isArray(response)) {
-        // Handle case where response is directly an array
-        setSearchResults(response);
+      // Step 1: Try Mapbox API first
+      try {
+        console.log('🔍 [Mapbox] Searching for:', query);
+        const mapboxResponse = await api.mapboxGeocode(query);
+        console.log('📍 [Mapbox Response] Received:', mapboxResponse);
+        
+        // Normalize Mapbox results to consistent structure
+        if (mapboxResponse && mapboxResponse.features && Array.isArray(mapboxResponse.features)) {
+          results = mapboxResponse.features
+            .slice(0, 5) // Limit to 5 results
+            .map(feature => ({
+              name: feature.place_name || feature.text,
+              lat: feature.center[1], // Mapbox uses [lon, lat]
+              lon: feature.center[0],
+              type: feature.place_type?.[0] || 'place',
+            }));
+          console.log('✅ [Mapbox] Found:', results.length, 'results');
+        } else if (mapboxResponse && mapboxResponse.success) {
+          // Handle API proxy wrapper response
+          if (mapboxResponse.data && Array.isArray(mapboxResponse.data)) {
+            results = mapboxResponse.data;
+            console.log('✅ [Mapbox Proxy] Found:', results.length, 'results');
+          }
+        }
+      } catch (mapboxErr) {
+        console.warn('⚠️ [Mapbox] API call failed, trying fallback:', mapboxErr.message);
+        // Continue to fallback instead of throwing
+      }
+      
+      // Step 2: If Mapbox returns no results, fallback to GHANA_LOCATIONS
+      if (!results || results.length === 0) {
+        console.log('📍 [Fallback] Mapbox had no results, checking GHANA_LOCATIONS...');
+        const queryLower = query.toLowerCase();
+        const matchedLocations = GHANA_LOCATIONS.filter(loc => 
+          loc.name.toLowerCase().includes(queryLower) || 
+          queryLower.includes(loc.name.toLowerCase())
+        );
+        
+        if (matchedLocations.length > 0) {
+          results = matchedLocations.map(loc => ({
+            name: loc.name,
+            lat: loc.lat,
+            lon: loc.lon,
+            type: loc.type || 'city',
+          }));
+          console.log('✅ [Fallback] Found Ghana locations:', results.length);
+        }
+      }
+      
+      console.log('📊 [Final] Total results:', results.length);
+      setSearchResults(results);
+      setSearching(false);
+      
+      // Auto-show map when we have results
+      if (results.length > 0) {
+        setShowMap(true);
+        const firstResult = results[0];
+        setMapCenter([parseFloat(firstResult.lat), parseFloat(firstResult.lon)]);
       } else {
-        console.warn('Unexpected response format:', response);
-        setSearchResults([]);
+        // No results but still show map centered on Ghana for manual selection
+        console.log('📍 [Fallback] Showing Ghana map for manual selection');
+        setShowMap(true);
+        setMapCenter([6.5, -1.0]); // Center of Ghana
       }
     } catch (err) {
-      console.error('Search error:', err);
+      console.error('❌ [Error] Search failed:', err.message);
+      console.error('Full error:', err);
       setSearchResults([]);
-    } finally {
       setSearching(false);
+      setShowDropdown(true); // Keep dropdown visible to show error
+      // Show Ghana map anyway for fallback selection
+      setShowMap(true);
+      setMapCenter([6.5, -1.0]);
     }
   };
+
+  // Debounced search handler (300ms)
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+    
+    // Clear existing debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    // Set new debounce timer (300ms for faster feedback)
+    debounceTimerRef.current = setTimeout(() => {
+      performSearch(query);
+    }, 300); // 300ms debounce for faster response
+  };
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleSelectResult = (result) => {
     const locationObj = {
@@ -144,6 +232,7 @@ function LocationPicker({ label, value, location, onLocationChange, onCoordinate
     onLocationChange(locationObj.name);
     onCoordinatesChange(locationObj);
     setSearchResults([]);
+    setShowDropdown(false);
     setShowMap(false);
     console.log('Selected location:', locationObj);
   };
@@ -176,6 +265,7 @@ function LocationPicker({ label, value, location, onLocationChange, onCoordinate
       onCoordinatesChange(locationObj);
       setTempMarker(null);
       setShowMap(false);
+      setShowDropdown(false);
       console.log('Map location selected:', locationObj);
     } catch (err) {
       console.error('Reverse geocode error:', err);
@@ -202,59 +292,102 @@ function LocationPicker({ label, value, location, onLocationChange, onCoordinate
             <div className="relative flex-1">
               <FaSearch className="absolute left-3 top-3 text-gray-400" />
               <input
+                ref={searchInputRef}
                 type="text"
                 value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  handleSearch(e.target.value);
-                }}
-                placeholder={`Search for ${label.toLowerCase()}...`}
+                onChange={(e) => handleSearch(e.target.value)}
+                onFocus={() => searchQuery.trim() && setShowDropdown(true)}
+                placeholder={`Search for ${label.toLowerCase()}... (e.g., Accra, Kumasi)`}
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 autoComplete="off"
               />
+              {searching && (
+                <div className="absolute right-3 top-3">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-500"></div>
+                </div>
+              )}
             </div>
             <button
               type="button"
-              onClick={() => {
-                setShowMap(!showMap);
-                setSearchResults([]);
-              }}
-              className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 flex items-center gap-2"
+              onClick={() => setShowMap(!showMap)}
+              className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 flex items-center gap-2 whitespace-nowrap"
             >
               <FaMapMarkerAlt /> Map
             </button>
           </div>
 
-          {/* Search Results Dropdown */}
-          {searchResults.length > 0 && (
+          {/* Search Results Dropdown - Show if dropdown is open and (we're searching or have results) */}
+          {showDropdown && searchQuery.trim() && (searchResults.length > 0 || searching) && (
             <div 
-              ref={searchResultsRef} 
-              className="absolute top-full left-0 right-0 mt-2 bg-white border-2 border-yellow-300 rounded-lg shadow-2xl z-[9999] max-h-80 overflow-y-auto"
+              ref={dropdownRef}
+              className="absolute top-full left-0 right-0 mt-1 bg-white border-2 border-yellow-300 rounded-lg shadow-2xl z-[9999] max-h-80 overflow-y-auto"
               style={{ 
                 pointerEvents: 'auto',
-                minWidth: '100%'
               }}
             >
-              {searching ? (
-                <div className="p-4 text-center text-gray-500 font-medium">Searching locations...</div>
-              ) : searchResults.length === 0 ? (
-                <div className="p-4 text-center text-gray-400">No results found</div>
-              ) : (
-                searchResults.map((result, idx) => (
+              {searching && searchResults.length === 0 && (
+                <div className="p-4 text-center">
+                  <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-500 mb-2"></div>
+                  <p className="text-sm text-gray-600 font-medium">Searching for "{searchQuery}"...</p>
+                  <p className="text-xs text-gray-400 mt-1">Finding locations matching your search</p>
+                </div>
+              )}
+              
+              {searchResults.length > 0 && (
+                <>
+                  <div className="p-2 bg-yellow-50 border-b border-yellow-100 sticky top-0">
+                    <p className="text-xs text-yellow-700 font-semibold">
+                      ✨ Found {searchResults.length} location{searchResults.length > 1 ? 's' : ''} - Click to select or use map
+                    </p>
+                  </div>
+                  {searchResults.map((result, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleSelectResult(result)}
+                      className="w-full text-left px-4 py-3 hover:bg-yellow-100 active:bg-yellow-200 border-b border-gray-100 last:border-b-0 text-sm flex items-start gap-3 transition-all duration-100"
+                    >
+                      <FaMapMarkerAlt className="text-yellow-600 mt-1 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-gray-900 truncate">{result.name || result.display_name}</p>
+                        <p className="text-xs text-gray-500 truncate">{result.type || 'Location'}</p>
+                        <p className="text-xs text-yellow-600 mt-1">
+                          📍 Lat: {parseFloat(result.lat).toFixed(4)}, Lon: {parseFloat(result.lon).toFixed(4)}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Show "No results" message with Ghana fallback options */}
+          {showDropdown && searchQuery.trim() && !searching && searchResults.length === 0 && (
+            <div 
+              className="absolute top-full left-0 right-0 mt-1 bg-white border-2 border-yellow-300 rounded-lg shadow-2xl z-[9999] p-4"
+            >
+              <p className="text-sm text-gray-600 mb-3">⚠️ No locations found for "{searchQuery}"</p>
+              <p className="text-xs text-gray-500 mb-3">Suggested Ghana locations:</p>
+              <div className="space-y-2">
+                {GHANA_LOCATIONS.map((location, idx) => (
                   <button
                     key={idx}
                     type="button"
-                    onClick={() => handleSelectResult(result)}
-                    className="w-full text-left px-4 py-3 hover:bg-yellow-100 active:bg-yellow-200 border-b border-gray-100 last:border-b-0 text-sm flex items-start gap-3 transition-all duration-100"
+                    onClick={() => handleSelectResult(location)}
+                    className="w-full text-left px-3 py-2 hover:bg-yellow-100 text-sm flex items-center gap-2 rounded transition-all"
                   >
-                    <FaMapMarkerAlt className="text-yellow-600 mt-1 flex-shrink-0" />
+                    <FaMapMarkerAlt className="text-yellow-600 flex-shrink-0" />
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-gray-900 truncate">{result.name || result.display_name}</p>
-                      <p className="text-xs text-gray-500 truncate">{result.type || 'Location'}</p>
+                      <p className="font-medium text-gray-900">{location.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {parseFloat(location.lat).toFixed(4)}, {parseFloat(location.lon).toFixed(4)}
+                      </p>
                     </div>
                   </button>
-                ))
-              )}
+                ))}
+              </div>
+              <p className="text-xs text-yellow-600 mt-4 font-semibold">💡 Or use the Map button and click to select your location</p>
             </div>
           )}
         </div>
@@ -262,34 +395,44 @@ function LocationPicker({ label, value, location, onLocationChange, onCoordinate
         {/* Display Selected Location */}
         {location && (
           <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-            <p className="text-sm font-medium text-yellow-900">Selected:</p>
-            <p className="text-sm text-yellow-800">
+            <p className="text-sm font-medium text-yellow-900">✓ Selected:</p>
+            <p className="text-sm text-yellow-800 font-semibold">
               {typeof location === 'object' ? location.name : location}
             </p>
             {typeof location === 'object' && location.lat && (
-              <p className="text-xs text-yellow-700">
-                Lat: {parseFloat(location.lat).toFixed(4)}, Lon: {parseFloat(location.lon).toFixed(4)}
+              <p className="text-xs text-yellow-700 mt-1">
+                📍 Lat: {parseFloat(location.lat).toFixed(5)}, Lon: {parseFloat(location.lon).toFixed(5)}
               </p>
             )}
           </div>
         )}
 
-        {/* Map Selector */}
-        {showMap && (
-          <div className="mt-4 border-2 border-yellow-300 rounded-md overflow-hidden bg-white shadow-lg">
+        {/* Map Selector - Auto-open when results appear OR for fallback */}
+        {(showMap || (searchResults.length > 0 && !searching)) && (
+          <div className="mt-4 border-2 border-yellow-300 rounded-md overflow-hidden bg-white shadow-lg" data-map-id={label}>
             {/* Map Instructions */}
             <div className="bg-yellow-50 border-b border-yellow-200 p-3 flex items-start gap-2">
               <FaMapMarkerAlt className="text-yellow-600 mt-1 flex-shrink-0" />
               <div>
-                <p className="text-sm font-semibold text-yellow-900">Click on the map to select {label.toLowerCase()}</p>
-                <p className="text-xs text-yellow-700">Red marker shows your click. Location will be auto-detected.</p>
+                <p className="text-sm font-semibold text-yellow-900">
+                  {searchResults.length > 0 ? 
+                    `🎯 Interactive Map - ${searchResults.length} location${searchResults.length > 1 ? 's' : ''} shown` :
+                    `📍 Ghana Map - Click to select ${label.toLowerCase()}`
+                  }
+                </p>
+                <p className="text-xs text-yellow-700">
+                  {searchResults.length > 0 ? 
+                    `Click a marker on the map to select` : 
+                    `Click anywhere on the map to select your location and auto-detect address`
+                  }
+                </p>
               </div>
             </div>
             {/* Map Container */}
             <div style={{ width: '100%', height: '500px', position: 'relative' }}>
               <MapContainer
-                center={location && location.lat ? [location.lat, location.lon] : [5.6037, -0.1870]}
-                zoom={location && location.lat ? 15 : 7}
+                center={mapCenter}
+                zoom={searchResults.length > 0 ? 13 : 7}
                 style={{ width: '100%', height: '100%' }}
               >
                 <TileLayer
@@ -297,13 +440,83 @@ function LocationPicker({ label, value, location, onLocationChange, onCoordinate
                   attribution='&copy; OpenStreetMap contributors'
                 />
                 
+                {/* Show ALL search results as markers on map */}
+                {searchResults.length > 0 && (
+                  searchResults.map((result, idx) => {
+                    const lat = parseFloat(result.lat);
+                    const lon = parseFloat(result.lon);
+                    return (
+                      <Marker
+                        key={`${label}-result-${idx}`}
+                        position={[lat, lon]}
+                        eventHandlers={{
+                          click: () => {
+                            console.log('📍 Marker clicked:', result.name);
+                            handleSelectResult(result);
+                          },
+                        }}
+                      >
+                        <Popup>
+                          <div className="text-sm">
+                            <p className="font-semibold text-yellow-700">{result.name || result.display_name}</p>
+                            <p className="text-xs text-gray-600 mb-2">{result.type || 'Location'}</p>
+                            <p className="text-xs text-gray-500 mb-2">
+                              📍 {lat.toFixed(5)}, {lon.toFixed(5)}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                console.log('🔘 Button clicked in popup:', result.name);
+                                handleSelectResult(result);
+                              }}
+                              className="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-1 px-2 rounded text-xs font-medium"
+                            >
+                              ✓ Select This
+                            </button>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    );
+                  })
+                )}
+                
+                {/* Show all Ghana locations as reference points when no search results */}
+                {searchResults.length === 0 && (
+                  GHANA_LOCATIONS.map((location, idx) => (
+                    <Marker
+                      key={`ghana-ref-${idx}`}
+                      position={[location.lat, location.lon]}
+                      eventHandlers={{
+                        click: () => {
+                          console.log('📍 Reference location clicked:', location.name);
+                          handleSelectResult(location);
+                        },
+                      }}
+                    >
+                      <Popup>
+                        <div className="text-sm">
+                          <p className="font-semibold text-yellow-700">{location.name}</p>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectResult(location)}
+                            className="w-full mt-2 bg-yellow-600 hover:bg-yellow-700 text-white py-1 px-2 rounded text-xs font-medium"
+                          >
+                            ✓ Select {location.name}
+                          </button>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  ))
+                )}
+                
                 {/* Show previously selected location */}
-                {location && location.lat && !tempMarker && (
+                {location && location.lat && searchResults.length === 0 && !tempMarker && (
                   <Marker position={[parseFloat(location.lat), parseFloat(location.lon)]}>
                     <Popup>
                       <div className="text-sm">
-                        <p className="font-semibold">✓ {location.name}</p>
-                        <p className="text-xs text-gray-600">
+                        <p className="font-semibold">✓ Selected</p>
+                        <p className="text-xs text-gray-600">{location.name}</p>
+                        <p className="text-xs text-gray-500">
                           {parseFloat(location.lat).toFixed(4)}, {parseFloat(location.lon).toFixed(4)}
                         </p>
                       </div>
@@ -338,7 +551,10 @@ function LocationPicker({ label, value, location, onLocationChange, onCoordinate
             {/* Map Footer */}
             <div className="bg-gray-50 border-t border-gray-200 p-3 flex justify-between items-center">
               <p className="text-xs text-gray-600">
-                {tempMarker ? '⏳ Detecting location from coordinates...' : '👆 Click anywhere on the map'}
+                {tempMarker ? '⏳ Detecting location...' : 
+                 searching ? `🔄 Searching (${searchResults.length} results loaded)` :
+                 searchResults.length > 0 ? `✨ ${searchResults.length} location${searchResults.length > 1 ? 's' : ''} on map - click marker to select` :
+                 `👆 Click on a location marker or anywhere on the map to select`}
               </p>
               <button
                 type="button"
@@ -346,7 +562,7 @@ function LocationPicker({ label, value, location, onLocationChange, onCoordinate
                   setShowMap(false);
                   setTempMarker(null);
                 }}
-                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 text-sm"
               >
                 Close Map
               </button>
@@ -573,6 +789,11 @@ export default function TripForm() {
         distance: formData.distance ? parseFloat(formData.distance) : 0,
         trip_date: formData.trip_date,
         status: formData.status,
+        // Add coordinates to the trip data
+        origin_lat: startCoords ? parseFloat(startCoords.lat) : null,
+        origin_lng: startCoords ? parseFloat(startCoords.lon) : null,
+        destination_lat: endCoords ? parseFloat(endCoords.lat) : null,
+        destination_lng: endCoords ? parseFloat(endCoords.lon) : null,
       };
 
       console.log('Submitting trip:', submitData);

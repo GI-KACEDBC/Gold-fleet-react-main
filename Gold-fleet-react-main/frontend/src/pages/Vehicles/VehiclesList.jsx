@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function VehiclesList() {
+  const navigate = useNavigate();
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -33,6 +34,15 @@ export default function VehiclesList() {
     } catch (error) {
       console.error('Failed to delete vehicle:', error);
     }
+  };
+
+  // Determine if vehicle can be tracked (active AND assigned)
+  const canTrackVehicle = (vehicle) => {
+    return vehicle.status === 'active' && (vehicle.assigned_driver_id || vehicle.driver);
+  };
+
+  const handleCheckLocation = (vehicleId) => {
+    navigate(`/map?vehicleId=${vehicleId}`);
   };
 
   return (
@@ -141,6 +151,18 @@ export default function VehiclesList() {
                         <Link to={`/vehicles/${vehicle.id}`} className="text-blue-600 hover:text-blue-900">
                           View
                         </Link>
+                        <button
+                          onClick={() => handleCheckLocation(vehicle.id)}
+                          disabled={!canTrackVehicle(vehicle)}
+                          className={`${
+                            canTrackVehicle(vehicle)
+                              ? 'text-green-600 hover:text-green-900 cursor-pointer'
+                              : 'text-gray-400 cursor-not-allowed'
+                          }`}
+                          title={canTrackVehicle(vehicle) ? 'Check vehicle location' : 'Only active assigned vehicles can be tracked'}
+                        >
+                          Track
+                        </button>
                         <Link to={`/vehicles/${vehicle.id}/edit`} className="text-yellow-600 hover:text-yellow-900">
                           Edit
                         </Link>

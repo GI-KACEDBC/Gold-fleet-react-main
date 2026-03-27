@@ -38,6 +38,7 @@ use App\Http\Controllers\PaymentSimulationController;
 use App\Http\Controllers\PlatformPaymentController;
 use App\Http\Controllers\TripSimulationController;
 use App\Http\Controllers\GeocodingController;
+use App\Http\Controllers\MapboxProxyController;
 
 // API routes for frontend consumption. These return JSON and are prefixed with /api by the framework.
 
@@ -49,6 +50,48 @@ Route::post('/driver-register', [AuthController::class, 'driverRegister']);
 Route::post('/driver-activate', [AuthController::class, 'driverActivate']);
 Route::post('/cancel-signup', [AuthController::class, 'cancelSignup']);
 
+// Email Verification routes (public verification endpoint)
+Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify']);
+
+// Quick email verification via API (no email link needed)
+// Development: Can be public, Production: Add middleware('auth:sanctum')
+Route::post('/email/quick-verify', [EmailVerificationController::class, 'quickVerify']);
+
+// Email Verification routes (protected - require authentication)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/email/send-verification', [EmailVerificationController::class, 'send']);
+});
+
+// ========== DEVELOPMENT ONLY - EMAIL VERIFICATION MANAGEMENT ==========
+// These routes are ONLY available in local/development environment
+if (app()->environment('local', 'development')) {
+    Route::prefix('dev')->group(function () {
+        // View all pending email verifications with clickable links
+        Route::get('/email/pending-verifications', [
+            \App\Http\Controllers\Api\EmailVerificationDevelopmentController::class, 
+            'getPendingVerifications'
+        ]);
+        
+        // Get verification status for a specific user
+        Route::get('/email/user/{userId}/status', [
+            \App\Http\Controllers\Api\EmailVerificationDevelopmentController::class, 
+            'getUserVerificationStatus'
+        ]);
+        
+        // Force verify a user's email (for testing)
+        Route::post('/email/user/{userId}/force-verify', [
+            \App\Http\Controllers\Api\EmailVerificationDevelopmentController::class, 
+            'forceVerifyEmail'
+        ]);
+        
+        // Resend verification email to a user
+        Route::post('/email/user/{userId}/resend', [
+            \App\Http\Controllers\Api\EmailVerificationDevelopmentController::class, 
+            'resendVerificationEmail'
+        ]);
+    });
+}
+
 // Public contact endpoint for inbound messages
 Route::post('/contact', [ContactController::class, 'store']);
 
@@ -59,6 +102,7 @@ Route::get('/map-clicks', [MapClickController::class, 'index']);
 // Public geocoding endpoints (no auth needed)
 Route::post('/geocode', [GeocodingController::class, 'geocode']);
 Route::post('/reverse-geocode', [GeocodingController::class, 'reverseGeocode']);
+Route::post('/mapbox-proxy', [MapboxProxyController::class, 'geocode']);
 
 // Platform Owner Auth routes (public)
 Route::prefix('platform')->group(function () {
@@ -95,7 +139,7 @@ Route::prefix('platform')->group(function () {
         Route::get('/company/{companyId}/admins', [PlatformMessageController::class, 'getCompanyAdmins']);
         
         Route::get('/settings', [PlatformDashboardController::class, 'getSettings']);
-        Route::post('/settings', [PlatformDashboardController::class, 'updateSettings']);
+        Route::match(['post', 'put'], '/settings', [PlatformDashboardController::class, 'updateSettings']);
         
         // Subscription Management endpoints
         Route::get('/subscription-management', [SubscriptionManagementController::class, 'index']);
@@ -237,6 +281,10 @@ Route::middleware('authorize.api.token')->group(function () {
         // Resource endpoints - Vehicles, Drivers, Trips, Services, Inspections, Issues, Expenses, Fuel, Reminders
         Route::apiResource('vehicles', VehicleController::class);
         Route::apiResource('drivers', DriverController::class);
+        
+        // Driver setup link regeneration
+        Route::post('/drivers/{driver}/regenerate-setup-link', [DriverController::class, 'regenerateSetupLink']);
+        
         Route::apiResource('trips', TripController::class);
         Route::apiResource('services', ServiceController::class);
         Route::apiResource('inspections', InspectionController::class);

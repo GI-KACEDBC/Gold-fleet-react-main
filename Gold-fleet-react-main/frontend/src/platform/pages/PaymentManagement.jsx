@@ -239,46 +239,6 @@ export default function PaymentManagement() {
           </div>
         )}
 
-        {/* Companies Summary */}
-        {companiesSummary.length > 0 && (
-          <div className="bg-white rounded-xl shadow-lg border-2 border-yellow-500 p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Company Payment Summary</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-yellow-50 border-b-2 border-yellow-500">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase font-bold">Company</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-yellow-700 uppercase">Total Paid</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-yellow-700 uppercase">Company Earnings</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-yellow-700 uppercase">Payments</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-yellow-700 uppercase">Last Payment</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {companiesSummary.map((company) => (
-                    <tr key={company.company_id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <p className="font-medium text-gray-900">{company.company_name}</p>
-                        <p className="text-sm text-gray-500">{company.company_email}</p>
-                      </td>
-                      <td className="px-6 py-4 font-semibold text-gray-900">
-                        {formatCurrency(company.total_paid)}
-                      </td>
-                      <td className="px-6 py-4 text-gray-900 font-semibold">
-                        {formatCurrency(company.company_earnings)}
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">{company.payment_count}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {new Date(company.last_payment_date).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div>
@@ -436,6 +396,46 @@ export default function PaymentManagement() {
             </div>
           </div>
         </div>
+
+        {/* Companies Summary */}
+        {companiesSummary.length > 0 && (
+          <div className="bg-white rounded-xl shadow-lg border-2 border-yellow-500 p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Company Payment Summary</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-yellow-50 border-b-2 border-yellow-500">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase font-bold">Company</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-yellow-700 uppercase">Total Paid</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-yellow-700 uppercase">Company Earnings</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-yellow-700 uppercase">Payments</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-yellow-700 uppercase">Last Payment</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {companiesSummary.map((company) => (
+                    <tr key={company.company_id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <p className="font-medium text-gray-900">{company.company_name}</p>
+                        <p className="text-sm text-gray-500">{company.company_email}</p>
+                      </td>
+                      <td className="px-6 py-4 font-semibold text-gray-900">
+                        {formatCurrency(company.total_paid)}
+                      </td>
+                      <td className="px-6 py-4 text-gray-900 font-semibold">
+                        {formatCurrency(company.company_earnings)}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">{company.payment_count}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {new Date(company.last_payment_date).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Payment Detail Modal */}
         {selectedPayment && (

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { useSearchParams } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { api } from '../services/api';
@@ -17,8 +18,8 @@ L.Icon.Default.mergeOptions({
 const createVehicleIcon = (color = '#CFAF4B', isActive = true) => {
   return L.divIcon({
     iconSize: [38, 38],
-    iconAnchor: [19, 38],
-    popupAnchor: [0, -38],
+    iconAnchor: [19, 19],
+    popupAnchor: [0, -19],
     className: 'vehicle-marker',
     html: `
       <div style="
@@ -33,9 +34,15 @@ const createVehicleIcon = (color = '#CFAF4B', isActive = true) => {
         justify-content: center;
         font-size: 18px;
         color: white;
+        pointer-events: auto;
+        cursor: pointer;
+        z-index: 1000;
+        position: absolute;
+        top: -19px;
+        left: -19px;
         ${isActive ? `animation: pulse-active 2s infinite;` : ''}
       ">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 16 16">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 16 16" style="pointer-events: none;">
           <path d="M8 1a1 1 0 0 1 1 1v4h4a1 1 0 0 1 .82 1.573l-4 6A1 1 0 0 1 8 14a1 1 0 0 1-.82-.427l-4-6A1 1 0 0 1 3 6h4V2a1 1 0 0 1 1-1z"/>
         </svg>
       </div>
@@ -53,8 +60,8 @@ const createVehicleIcon = (color = '#CFAF4B', isActive = true) => {
 const createDeviceIcon = () => {
   return L.divIcon({
     iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16],
     className: 'device-marker',
     html: `
       <div style="
@@ -67,9 +74,15 @@ const createDeviceIcon = () => {
         display: flex;
         align-items: center;
         justify-content: center;
+        pointer-events: auto;
+        cursor: pointer;
+        z-index: 1001;
+        position: absolute;
+        top: -16px;
+        left: -16px;
         animation: pulse-device 1.5s infinite;
       ">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="white" viewBox="0 0 16 16">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="white" viewBox="0 0 16 16" style="pointer-events: none;">
           <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zm0 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2zm0 1a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/>
         </svg>
       </div>
@@ -170,6 +183,9 @@ function ClickCapture({ onPoint }) {
 }
 
 export default function MapDashboard() {
+  const [searchParams] = useSearchParams();
+  const vehicleIdParam = searchParams.get('vehicleId');
+  
   const [vehicles, setVehicles] = useState([]);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -312,8 +328,8 @@ export default function MapDashboard() {
           plate_number: v.plate_number,
           model: v.model,
           status: v.status || 'idle',
-          lat: parseFloat(v.latitude || 5.6037) + (Math.random() - 0.5) * 0.1,
-          lng: parseFloat(v.longitude || -0.1870) + (Math.random() - 0.5) * 0.1,
+          lat: parseFloat(v.latitude || 5.6037),
+          lng: parseFloat(v.longitude || -0.1870),
           speed: Math.floor(Math.random() * 120),
           fuel_level: Math.floor(Math.random() * 100) + 20,
           odometer: Math.floor(Math.random() * 150000) + 50000,
@@ -356,6 +372,17 @@ export default function MapDashboard() {
     }, 100);
     return () => clearTimeout(timer);
   }, [fetchVehicleData]);
+
+  // Auto-select vehicle from URL parameter
+  useEffect(() => {
+    if (vehicleIdParam && vehicles.length > 0) {
+      const vehicle = vehicles.find(v => v.id === parseInt(vehicleIdParam));
+      if (vehicle) {
+        setSelectedVehicle(vehicle);
+        console.log('Auto-selected vehicle from URL:', vehicle.id);
+      }
+    }
+  }, [vehicleIdParam, vehicles]);
 
   // Auto-refresh
   useEffect(() => {
@@ -488,6 +515,7 @@ export default function MapDashboard() {
               position={[vehicle.lat, vehicle.lng]}
               icon={createVehicleIcon('#CFAF4B', vehicle.status === 'active')}
               eventHandlers={{ click: () => { setSelectedVehicle(vehicle); setPanelOpen(true); } }}
+              pane="markerPane"
             >
               <Popup>
                 <div className="text-sm">
@@ -502,7 +530,7 @@ export default function MapDashboard() {
 
           {/* Device Location Marker */}
           {deviceLocation && (
-            <Marker position={[deviceLocation.lat, deviceLocation.lng]} icon={createDeviceIcon()}>
+            <Marker position={[deviceLocation.lat, deviceLocation.lng]} icon={createDeviceIcon()} pane="markerPane">
               <Popup>
                 <div className="text-sm">
                   <p className="font-bold text-blue-600">📱 Your Device Location</p>
@@ -529,7 +557,7 @@ export default function MapDashboard() {
           {/* Click handler - capture any map click, show coordinates/address */}
           <ClickCapture onPoint={(pt) => setClickedPoint(pt)} />
           {clickedPoint && (
-            <Marker position={[clickedPoint.lat, clickedPoint.lng]}>
+            <Marker position={[clickedPoint.lat, clickedPoint.lng]} pane="markerPane">
               <Popup>
                 <div className="text-sm">
                   <p className="font-bold">Clicked Point</p>

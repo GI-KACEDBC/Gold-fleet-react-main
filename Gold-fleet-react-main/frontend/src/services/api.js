@@ -89,6 +89,7 @@ export const api = {
     body: data instanceof FormData ? data : JSON.stringify(data) 
   }),
   deleteDriver: (id) => apiCall(`${API_BASE_URL}/drivers/${id}`, { method: 'DELETE' }),
+  regenerateDriverSetupLink: (id) => apiCall(`${API_BASE_URL}/drivers/${id}/regenerate-setup-link`, { method: 'POST' }),
 
   // Trips
   getTrips: () => apiCall(`${API_BASE_URL}/trips`),
@@ -237,6 +238,7 @@ export const api = {
   // Geocoding (location services - no auth needed)
   geocode: (location) => apiCall(`${API_BASE_URL}/geocode`, { method: 'POST', body: JSON.stringify({ location }) }),
   reverseGeocode: (lat, lon) => apiCall(`${API_BASE_URL}/reverse-geocode`, { method: 'POST', body: JSON.stringify({ lat, lon }) }),
+  mapboxGeocode: (query) => apiCall(`${API_BASE_URL}/mapbox-proxy`, { method: 'POST', body: JSON.stringify({ q: query }) }),
 };
 
 export default api;

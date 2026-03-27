@@ -31,7 +31,7 @@ export default function DriverTripView() {
   const [endCoords, setEndCoords] = useState(null);
   const [startingTrip, setStartingTrip] = useState(false);
   const [stoppingTrip, setStoppingTrip] = useState(false);
-  const [mapCenter, setMapCenter] = useState([20.5344, 78.9629]); // Default India center
+  const [mapCenter, setMapCenter] = useState([5.6037, -0.1870]); // Default Ghana center
 
   // Fetch trip details
   useEffect(() => {
@@ -42,22 +42,28 @@ export default function DriverTripView() {
         const tripData = response.data || response;
         setTrip(tripData);
         
-        // Geocode locations
-        if (tripData.start_location) {
+        // Use stored coordinates if available, otherwise geocode
+        if (tripData.origin_lat && tripData.origin_lng) {
+          const startCoord = [parseFloat(tripData.origin_lat), parseFloat(tripData.origin_lng)];
+          setStartCoords(startCoord);
+          setMapCenter(startCoord);
+        } else if (tripData.start_location) {
           try {
             const coords = await geocodeLocation(tripData.start_location);
             setStartCoords(coords);
             setMapCenter(coords);
           } catch (err) {
             console.error('Error geocoding start location:', err);
-            // Set India center as fallback
-            setStartCoords([20.5344, 78.9629]);
+            setStartCoords([5.6037, -0.1870]); // Ghana center
           }
         } else {
-          setStartCoords([20.5344, 78.9629]);
+          setStartCoords([5.6037, -0.1870]); // Ghana center
         }
 
-        if (tripData.end_location) {
+        if (tripData.destination_lat && tripData.destination_lng) {
+          const endCoord = [parseFloat(tripData.destination_lat), parseFloat(tripData.destination_lng)];
+          setEndCoords(endCoord);
+        } else if (tripData.end_location) {
           try {
             const coords = await geocodeLocation(tripData.end_location);
             setEndCoords(coords);
@@ -80,7 +86,7 @@ export default function DriverTripView() {
 
   // Geocoding function
   const geocodeLocation = async (locationString) => {
-    if (!locationString) return [20.5344, 78.9629];
+    if (!locationString) return [5.6037, -0.1870];
 
     try {
       const response = await api.geocode(locationString);
@@ -92,7 +98,7 @@ export default function DriverTripView() {
       console.error('Geocoding error:', err);
     }
     
-    return [20.5344, 78.9629]; // Default fallback
+    return [5.6037, -0.1870]; // Default Ghana fallback
   };
 
   const handleStartTrip = async () => {

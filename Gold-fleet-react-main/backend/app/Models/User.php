@@ -99,6 +99,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Send the email verification notification with logging.
+     */
+    public function sendEmailVerificationNotification()
+    {
+        $this->notify(new \App\Notifications\CustomVerifyEmailNotification());
+    }
+
+    /**
      * Boot the model - attach deleting event listener
      */
     protected static function boot()

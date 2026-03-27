@@ -600,7 +600,7 @@ const AuthPage = () => {
                     setSubscriptionId(null)
                     loginForm.resetForm()
                     signupForm.resetForm()
-                    setError('✓ Account created successfully! Please check your email for verification.')
+                    setError('✓ Account created successfully! Please log in with your credentials.')
                     setSkipAutoRedirect(false)
                   }}
                   className="text-gray-400 hover:text-gray-200 text-2xl"
@@ -664,9 +664,9 @@ const AuthPage = () => {
                     }
                     
                     // Show success message first
-                    setError('✓ Account created successfully! Redirecting to dashboard...')
+                    setError('✓ Account created successfully! Redirecting to login page...')
                     
-                    // Complete signup - DON'T set skipAutoRedirect to false yet
+                    // Complete signup and reset form
                     setIsSignup(false)
                     setSignupStep(1)
                     setSelectedPlan(null)
@@ -675,10 +675,11 @@ const AuthPage = () => {
                     loginForm.resetForm()
                     signupForm.resetForm()
                     
-                    // Delay navigation so user sees the success message
+                    // Redirect to login page - user must log in with their credentials
+                    // Clear the temporary token that was created during signup
                     setTimeout(() => {
-                      const redirectPath = user?.role === 'driver' ? '/driver' : '/main'
-                      navigate(redirectPath, { replace: true })
+                      sessionStorage.removeItem('auth_token')
+                      navigate('/auth', { replace: true })
                     }, 1500)
                   }}
                   disabled={!paymentSimulations || paymentSimulations.length === 0}
