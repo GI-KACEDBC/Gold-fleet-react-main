@@ -25,6 +25,7 @@ class Inspection extends Model
         'checklist_items',
         'submitted_at',
         'admin_reviewed',
+        'inspection_image_path',
     ];
 
     protected $casts = [

@@ -120,7 +120,11 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setLoading(true)
     try {
-      // First, try driver login
+      console.log('[Auth] ========== LOGIN FLOW START ==========')
+      console.log('[Auth] Attempting login for:', email)
+
+      // Attempt login via unified endpoint
+      console.log('[Auth] Sending login request to /api/login...')
       const response = await fetch('http://localhost:8000/api/login', {
         method: 'POST',
         headers: {
@@ -129,39 +133,34 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify({ email, password }),
       })
 
+      console.log('[Auth] Response Status:', response.status)
+
       let data
       try {
         data = await response.json()
       } catch (e) {
-        console.error('Backend returned non-JSON response:', response.status)
+        console.error('[Auth] ✗ Backend returned non-JSON response:', response.status)
         throw new Error('Server error: ' + response.statusText)
       }
 
-      // If driver login fails with 403 "Invalid login channel", try admin login
-      if (response.status === 403 && data.message === 'Invalid login channel') {
-        console.log('[Auth] Driver endpoint rejected, trying admin endpoint...')
-        return await loginAsCompanyAdmin(email, password)
-      }
-
-      if (!response.ok) {
-        // Log the specific error for debugging
-        console.error('[Auth] Driver login failed with status', response.status, ':', data.message || 'Unknown error')
-        throw new Error(data.message || 'Login failed')
-      }
-
-      // Only set token if we have valid data
-      if (data.token) {
+      if (response.ok && data.token) {
+        console.log('[Auth] ✓ Login successful!')
+        console.log('[Auth] User Type:', data.user?.user_type, '| Role:', data.user?.role)
+        console.log('[Auth] ========== LOGIN FLOW COMPLETE ==========')
         setToken(data.token)
         setUser(data.user || null)
         setCompany(data.company || null)
         sessionStorage.setItem('auth_token', data.token)
-      } else {
-        throw new Error('No token received from server')
+        return data
       }
 
-      return data
+      // Login failed
+      console.error('[Auth] ✗ Login failed: Status', response.status)
+      console.error('[Auth] Message:', data.message || 'Unknown error')
+      throw new Error(data.message || 'Invalid email or password')
     } catch (error) {
       // Ensure failed login doesn't leave any auth state
+      console.error('[Auth] ✗ LOGIN ERROR:', error.message)
       setToken(null)
       setUser(null)
       setCompany(null)
@@ -172,6 +171,7 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  // Legacy method - kept for compatibility but not used in new unified login flow
   const loginAsCompanyAdmin = async (email, password) => {
     try {
       const response = await fetch('http://localhost:8000/api/company-admin-login', {
@@ -191,11 +191,9 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (!response.ok) {
-        console.error('[Auth] Company admin login failed with status', response.status, ':', data.message || 'Unknown error')
         throw new Error(data.message || 'Login failed')
       }
 
-      // Only set token if we have valid data
       if (data.token) {
         setToken(data.token)
         setUser(data.user || null)
@@ -207,7 +205,6 @@ export const AuthProvider = ({ children }) => {
 
       return data
     } catch (error) {
-      // Ensure failed login doesn't leave any auth state
       setToken(null)
       setUser(null)
       setCompany(null)

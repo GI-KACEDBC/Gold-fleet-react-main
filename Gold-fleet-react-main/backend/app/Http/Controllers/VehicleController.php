@@ -56,7 +56,7 @@ class VehicleController extends Controller
             $companyId = auth()->user()->company_id;
 
             $validator = Validator::make($request->all(), [
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp,svg,bmp,tiff,ico|max:51200',
+                'image' => 'nullable|file|mimetypes:image/jpeg,image/png,image/gif,image/webp,image/svg+xml,text/svg+xml,image/bmp,image/tiff|max:51200',
                 'name' => 'required|string|max:255',
                 'license_plate' => 'required|string|max:255|unique:vehicles,license_plate',
                 'type' => 'required|in:Car,Bus,Truck,Van',
@@ -174,7 +174,7 @@ class VehicleController extends Controller
             }
 
             $validator = Validator::make($request->all(), [
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp,svg,bmp,tiff,ico|max:51200',
+                'image' => 'nullable|file|mimetypes:image/jpeg,image/png,image/gif,image/webp,image/svg+xml,text/svg+xml,image/bmp,image/tiff|max:51200',
                 'name' => 'required|string|max:255',
                 'license_plate' => 'required|string|max:255|unique:vehicles,license_plate,' . $vehicle->id,
                 'type' => 'required|in:Car,Bus,Truck,Van',

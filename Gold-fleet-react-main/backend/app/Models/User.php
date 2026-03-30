@@ -31,7 +31,6 @@ class User extends Authenticatable
         'account_status',
         'company_id',
         'api_token',
-        'email_verified_at',
         'company_name',
         'company_email',
         'company_phone',
@@ -61,7 +60,6 @@ class User extends Authenticatable
      * @var array<string,string>
      */
     protected $casts = [
-        'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
 

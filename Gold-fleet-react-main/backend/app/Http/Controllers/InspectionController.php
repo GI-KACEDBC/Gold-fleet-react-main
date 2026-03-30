@@ -489,4 +489,57 @@ class InspectionController extends Controller
             Log::error('Failed to notify admin of completed inspection: ' . $e->getMessage());
         }
     }
+
+    /**
+     * Upload maintenance inspection image
+     */
+    public function uploadImage(Request $request, Inspection $inspection)
+    {
+        try {
+            $validated = $request->validate([
+                'image' => 'required|image|mimes:jpeg,png,gif,webp|max:5120', // 5MB max
+            ]);
+
+            // Check authorization - driver can only upload to their own inspections
+            if ($inspection->driver_id !== auth()->user()->driverId && auth()->user()->role !== 'admin') {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            // Delete old image if exists
+            if ($inspection->inspection_image_path) {
+                $oldPath = storage_path('app/public/' . $inspection->inspection_image_path);
+                if (file_exists($oldPath)) {
+                    unlink($oldPath);
+                }
+            }
+
+            // Use ImageService for compression (same as driver profile images)
+            $imageService = new \App\Services\ImageService();
+            $imagePath = $imageService->processImage(
+                $request->file('image'),
+                'inspections'
+            );
+
+            // Update inspection with image path
+            $inspection->update(['inspection_image_path' => $imagePath]);
+
+            return response()->json([
+                'data' => $inspection,
+                'message' => 'Image uploaded successfully'
+            ], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Inspection image upload error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to upload image'
+            ], 500);
+        }
+    }
 }

@@ -15,7 +15,9 @@ class DriverController extends Controller
     public function index()
     {
         $companyId = auth()->user()->company_id;
-        $drivers = Driver::where('company_id', $companyId)->with('user')->get();
+        $drivers = Driver::where('company_id', $companyId)
+            ->with(['user', 'createdBy:id,name,email'])
+            ->get();
         return response()->json(['data' => $drivers]);
     }
 
@@ -40,7 +42,7 @@ class DriverController extends Controller
             \Log::info('Driver store - incoming files: ' . json_encode(array_map(function($f){ return $f->getClientOriginalName(); }, $request->allFiles())));
 
             $validated = $request->validate([
-                'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp,svg,bmp,tiff,ico|max:51200',
+                'image' => 'required|file|mimetypes:image/jpeg,image/png,image/gif,image/webp,image/svg+xml,text/svg+xml,image/bmp,image/tiff|max:51200',
                 'name' => 'required|string|max:255',
                 'email' => 'required|email|unique:users,email',
                 'phone' => 'required|string|max:20',
@@ -79,6 +81,7 @@ class DriverController extends Controller
             $driver = Driver::create([
                 'company_id' => auth()->user()->company_id,
                 'user_id' => $user->id,
+                'created_by' => auth()->user()->id, // Track which admin created this driver
                 'setup_token' => $setupToken,
                 'account_activated' => false,
                 'vehicle_id' => $validated['vehicle_id'] ?? null,
@@ -127,7 +130,7 @@ class DriverController extends Controller
             abort(403);
         }
 
-        $driver->load(['user', 'vehicle', 'trips' => function($query) {
+        $driver->load(['user', 'vehicle', 'createdBy:id,name,email', 'trips' => function($query) {
             $query->latest()->limit(10);
         }]);
 
@@ -163,7 +166,7 @@ class DriverController extends Controller
             }
 
             $validated = $request->validate([
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp,svg,bmp,tiff,ico|max:51200',
+                'image' => 'nullable|file|mimetypes:image/jpeg,image/png,image/gif,image/webp,image/svg+xml,text/svg+xml,image/bmp,image/tiff|max:51200',
                 'name' => 'required|string|max:255',
                 'email' => 'required|email|unique:users,email,' . $driver->user_id,
                 'phone' => 'required|string|max:20',

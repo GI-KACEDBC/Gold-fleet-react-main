@@ -100,12 +100,6 @@ const AuthPage = () => {
     try {
       const result = await login(loginForm.values.email, loginForm.values.password)
       
-      // If login returns email_verified: false, show appropriate message
-      if (!result.user?.email_verified) {
-        setError('Please verify your email before logging in. Check your email for the verification link.')
-        return
-      }
-      
       const redirectPath = result.user?.role === 'driver' ? '/driver' : '/main'
       navigate(redirectPath, { replace: true })
     } catch (err) {
@@ -586,7 +580,7 @@ const AuthPage = () => {
             <div className="bg-gray-900 rounded-xl shadow-md p-8">
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">Setup Payment Simulation</h2>
+                  <h2 className="text-2xl font-bold text-white">Setup Payment</h2>
                   <p className="text-amber-500 mt-1">
                     {selectedPlan?.price === 0 ? 'Free Trial (12 days)' : 'Paid Plan - Simulate Your Usage'}
                   </p>
@@ -624,7 +618,7 @@ const AuthPage = () => {
               {(!paymentSimulations || paymentSimulations.length === 0) && (
                 <div className="mb-6 p-4 rounded-lg border border-yellow-300 bg-yellow-50 text-yellow-800">
                   <p className="font-semibold">⚠️ Required Step</p>
-                  <p className="text-sm mt-1">You must create at least one payment simulation before completing your account setup. This helps us understand your usage patterns.</p>
+                  <p className="text-sm mt-1">You must create at least one payment before completing your account setup.</p>
                 </div>
               )}
 
@@ -633,7 +627,7 @@ const AuthPage = () => {
                 selectedPlan={selectedPlan}
                 subscriptionId={subscriptionId}
                 onPaymentProcessed={() => {
-                  setError('✓ Payment simulation setup complete! Your account is ready to use.')
+                  setError('✓ Payment setup complete! Your account is ready to use.')
                 }}
                 onSimulationsUpdate={(simulations) => setPaymentSimulations(simulations)}
               />
@@ -642,7 +636,7 @@ const AuthPage = () => {
               {paymentSimulations && paymentSimulations.length > 0 && (
                 <div className="mt-6 p-4 rounded-lg border border-green-300 bg-green-50 text-green-800">
                   <p className="font-semibold">✓ Requirement Completed</p>
-                  <p className="text-sm mt-1">You have created {paymentSimulations.length} payment simulation{paymentSimulations.length !== 1 ? 's' : ''}. You can now complete the setup.</p>
+                  <p className="text-sm mt-1">You have created {paymentSimulations.length} payment{paymentSimulations.length !== 1 ? 's' : ''}. You can now complete the setup.</p>
                 </div>
               )}
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FaCheckCircle, FaTimesCircle, FaClock, FaEye, FaFolderOpen } from 'react-icons/fa';
+import { FaCheckCircle, FaTimesCircle, FaClock, FaEye, FaFolderOpen, FaImage } from 'react-icons/fa';
 import { api } from '../services/api';
 
 /**
@@ -295,6 +295,22 @@ function InspectionDetailModal({ inspection, onClose, onReview, loading }) {
               <p className="text-gray-700 bg-gray-50 p-3 rounded text-sm">
                 {inspection.notes}
               </p>
+            </div>
+          )}
+
+          {/* Maintenance Image */}
+          {inspection.inspection_image_path && (
+            <div className="mb-6">
+              <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <FaImage /> Maintenance Image
+              </h3>
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <img 
+                  src={`http://localhost:8000/storage/${inspection.inspection_image_path}`}
+                  alt="Maintenance" 
+                  className="max-w-full h-auto rounded-lg max-h-96 object-cover w-full"
+                />
+              </div>
             </div>
           )}
 

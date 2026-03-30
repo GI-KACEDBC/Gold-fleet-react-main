@@ -5,7 +5,6 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\PlatformAuthController;
 use App\Http\Controllers\Api\PlatformDashboardController;
-use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\CompanyApprovalController;
 use App\Http\Controllers\Api\PlatformStatusController;
 use App\Http\Controllers\Api\PlatformMessageController;
@@ -58,52 +57,11 @@ Route::get('/', function (Request $request) {
 // Auth routes (public)
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/company-admin-login', [AuthController::class, 'companyAdminLogin']);
+Route::post('/check-user-type', [AuthController::class, 'checkUserType']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/driver-register', [AuthController::class, 'driverRegister']);
 Route::post('/driver-activate', [AuthController::class, 'driverActivate']);
 Route::post('/cancel-signup', [AuthController::class, 'cancelSignup']);
-
-// Email Verification routes (public verification endpoint)
-Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify']);
-
-// Quick email verification via API (no email link needed)
-// Development: Can be public, Production: Add middleware('auth:sanctum')
-Route::post('/email/quick-verify', [EmailVerificationController::class, 'quickVerify']);
-
-// Email Verification routes (protected - require authentication)
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/email/send-verification', [EmailVerificationController::class, 'send']);
-});
-
-// ========== DEVELOPMENT ONLY - EMAIL VERIFICATION MANAGEMENT ==========
-// These routes are ONLY available in local/development environment
-if (app()->environment('local', 'development')) {
-    Route::prefix('dev')->group(function () {
-        // View all pending email verifications with clickable links
-        Route::get('/email/pending-verifications', [
-            \App\Http\Controllers\Api\EmailVerificationDevelopmentController::class, 
-            'getPendingVerifications'
-        ]);
-        
-        // Get verification status for a specific user
-        Route::get('/email/user/{userId}/status', [
-            \App\Http\Controllers\Api\EmailVerificationDevelopmentController::class, 
-            'getUserVerificationStatus'
-        ]);
-        
-        // Force verify a user's email (for testing)
-        Route::post('/email/user/{userId}/force-verify', [
-            \App\Http\Controllers\Api\EmailVerificationDevelopmentController::class, 
-            'forceVerifyEmail'
-        ]);
-        
-        // Resend verification email to a user
-        Route::post('/email/user/{userId}/resend', [
-            \App\Http\Controllers\Api\EmailVerificationDevelopmentController::class, 
-            'resendVerificationEmail'
-        ]);
-    });
-}
 
 // Public contact endpoint for inbound messages
 Route::post('/contact', [ContactController::class, 'store']);
@@ -278,6 +236,7 @@ Route::middleware('authorize.api.token')->group(function () {
     Route::post('/inspections/submit-checklist', [InspectionController::class, 'submitChecklist']);
     Route::get('/inspections/pending-reviews', [InspectionController::class, 'getPendingReviews']);
     Route::patch('/inspections/{inspection}/review', [InspectionController::class, 'reviewChecklist']);
+    Route::post('/inspections/{inspection}/upload-image', [InspectionController::class, 'uploadImage']);
 
     // ========== COMPANY MESSAGING ROUTES (NO APPROVAL REQUIRED) ==========
     // Company users can send messages to platform regardless of approval status

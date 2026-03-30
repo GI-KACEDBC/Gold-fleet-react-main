@@ -2,11 +2,17 @@ const API_BASE_URL = 'http://localhost:8000/api';
 
 const getAuthHeaders = () => {
   const token = sessionStorage.getItem('auth_token');
-  return {
-    'Authorization': token ? `Bearer ${token}` : '',
+  const headers = {
     'Accept': 'application/json',
     'X-Requested-With': 'XMLHttpRequest',
   };
+  
+  // Only include Authorization header if token exists
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
 };
 
 const apiCall = async (url, options = {}) => {
@@ -128,6 +134,14 @@ export const api = {
     method: 'PATCH', 
     body: JSON.stringify(data) 
   }),
+  uploadInspectionImage: (inspectionId, imageFile) => {
+    const formData = new FormData();
+    formData.append('image', imageFile);
+    return apiCall(`${API_BASE_URL}/inspections/${inspectionId}/upload-image`, {
+      method: 'POST',
+      body: formData
+    });
+  },
 
   // Issues
   getIssues: () => apiCall(`${API_BASE_URL}/issues`),

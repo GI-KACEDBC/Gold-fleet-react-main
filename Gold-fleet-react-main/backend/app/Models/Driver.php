@@ -15,6 +15,7 @@ class Driver extends Model
     protected $fillable = [
         'company_id',
         'user_id',
+        'created_by',
         'setup_token',
         'account_activated',
         'vehicle_id',
@@ -41,6 +42,11 @@ class Driver extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function vehicle(): BelongsTo
