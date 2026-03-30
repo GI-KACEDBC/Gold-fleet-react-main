@@ -14,29 +14,13 @@ export default function PlatformSignup() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Form state for owner registration (simplified)
+  // Form state for platform admin registration (fullname, email, phone, password)
   const [formData, setFormData] = useState({
-    // Admin info
     admin_name: '',
     admin_email: '',
+    admin_phone: '',
     admin_password: '',
     admin_password_confirmation: '',
-    
-    // Company info (minimal)
-    company_name: '',
-    company_phone: '',
-    
-    // Default values
-    company_email: '',
-    company_address: 'To be updated in settings',
-    company_city: '',
-    company_state: '',
-    company_zip: '',
-    company_country: '',
-    company_industry: '',
-    fleet_size: '0',
-    num_employees: '0',
-    subscription_plan: 'basic',
   });
 
   const handleInputChange = (e) => {
@@ -48,15 +32,12 @@ export default function PlatformSignup() {
   };
 
   const validateForm = () => {
-    if (!formData.admin_name.trim()) return 'Name is required';
+    if (!formData.admin_name.trim()) return 'Full name is required';
     if (!formData.admin_email.trim()) return 'Email is required';
+    if (!formData.admin_phone.trim()) return 'Phone is required';
     if (!formData.admin_password) return 'Password is required';
     if (formData.admin_password.length < 8) return 'Password must be 8+ characters';
     if (formData.admin_password !== formData.admin_password_confirmation) return 'Passwords don\'t match';
-    
-    if (!formData.company_name.trim()) return 'Company name is required';
-    if (!formData.company_phone.trim()) return 'Phone is required';
-    
     return null;
   };
 
@@ -171,22 +152,6 @@ export default function PlatformSignup() {
                 />
               </div>
 
-              {/* Company Name */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1 uppercase tracking-wide">
-                  Company Name <span className="text-gray-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="company_name"
-                  value={formData.company_name}
-                  onChange={handleInputChange}
-                  placeholder="Your Company Name"
-                  required
-                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-slate-400 transition-colors"
-                />
-              </div>
-
               {/* Phone */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1 uppercase tracking-wide">
@@ -194,8 +159,8 @@ export default function PlatformSignup() {
                 </label>
                 <input
                   type="tel"
-                  name="company_phone"
-                  value={formData.company_phone}
+                  name="admin_phone"
+                  value={formData.admin_phone}
                   onChange={handleInputChange}
                   placeholder="+1 (555) 123-4567"
                   required
@@ -234,23 +199,6 @@ export default function PlatformSignup() {
                     className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-slate-400 transition-colors"
                   />
                 </div>
-              </div>
-
-              {/* Subscription Plan */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1 uppercase tracking-wide">
-                  Plan
-                </label>
-                <select
-                  name="subscription_plan"
-                  value={formData.subscription_plan}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:border-slate-400 transition-colors"
-                >
-                  <option value="basic">Basic - $29/month</option>
-                  <option value="pro">Pro - $99/month</option>
-                  <option value="enterprise">Enterprise - Custom</option>
-                </select>
               </div>
             </div>
 
