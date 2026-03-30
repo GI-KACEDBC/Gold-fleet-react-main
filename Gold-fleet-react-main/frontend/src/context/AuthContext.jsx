@@ -120,6 +120,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setLoading(true)
     try {
+      // First, try driver login
       const response = await fetch('http://localhost:8000/api/login', {
         method: 'POST',
         headers: {
@@ -136,13 +137,15 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Server error: ' + response.statusText)
       }
 
-      // If driver login fails with 403 (permission denied), try company admin login
-      if (response.status === 403) {
-        console.log('[Auth] Driver login denied (403). Attempting company admin login...')
+      // If driver login fails with 403 "Invalid login channel", try admin login
+      if (response.status === 403 && data.message === 'Invalid login channel') {
+        console.log('[Auth] Driver endpoint rejected, trying admin endpoint...')
         return await loginAsCompanyAdmin(email, password)
       }
 
       if (!response.ok) {
+        // Log the specific error for debugging
+        console.error('[Auth] Driver login failed with status', response.status, ':', data.message || 'Unknown error')
         throw new Error(data.message || 'Login failed')
       }
 
@@ -188,6 +191,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (!response.ok) {
+        console.error('[Auth] Company admin login failed with status', response.status, ':', data.message || 'Unknown error')
         throw new Error(data.message || 'Login failed')
       }
 
@@ -209,8 +213,6 @@ export const AuthProvider = ({ children }) => {
       setCompany(null)
       sessionStorage.removeItem('auth_token')
       throw error
-    } finally {
-      setLoading(false)
     }
   }
 

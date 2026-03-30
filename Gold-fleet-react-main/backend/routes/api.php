@@ -42,6 +42,19 @@ use App\Http\Controllers\MapboxProxyController;
 
 // API routes for frontend consumption. These return JSON and are prefixed with /api by the framework.
 
+// API Root endpoint
+Route::get('/', function (Request $request) {
+    return response()->json([
+        'message' => 'Gold Fleet API',
+        'version' => '1.0',
+        'login_channels' => [
+            'driver' => '/api/login (POST) - For drivers only',
+            'admin' => '/api/company-admin-login (POST) - For company admins only',
+        ],
+        'documentation' => 'See storage/logs/auth.log for authentication details',
+    ]);
+});
+
 // Auth routes (public)
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/company-admin-login', [AuthController::class, 'companyAdminLogin']);

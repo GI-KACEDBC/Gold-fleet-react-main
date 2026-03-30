@@ -73,6 +73,7 @@ class DriverRoleAccessSeeder extends Seeder
                     'name' => $driverData['name'],
                     'password' => Hash::make('password123'),
                     'role' => 'driver',
+                    'user_type' => 'driver',
                     'company_id' => $company->id,
                     'api_token' => Str::random(80),
                     'email_verified_at' => now(),

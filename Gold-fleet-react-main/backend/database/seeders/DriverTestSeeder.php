@@ -47,6 +47,7 @@ class DriverTestSeeder extends Seeder
                 'name' => 'Test Driver',
                 'password' => Hash::make('password123'),
                 'role' => 'driver',
+                'user_type' => 'driver',
                 'company_id' => $company->id,
                 'api_token' => Str::random(80),
             ]

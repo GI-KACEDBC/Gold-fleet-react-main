@@ -103,6 +103,7 @@ class DriverLoginSeeder extends Seeder
                     'name' => $driverData['name'],
                     'password' => Hash::make($driverData['password']),
                     'role' => 'driver',
+                    'user_type' => 'driver',
                     'company_id' => $company->id,
                     'api_token' => Str::random(80),
                     'email_verified_at' => now(),

@@ -15,6 +15,12 @@ export const useMessageNotifications = (isEnabled = true) => {
 
   const loadMessages = useCallback(async () => {
     try {
+      // Check if user is authenticated before making API call
+      const token = sessionStorage.getItem('auth_token');
+      if (!token) {
+        return [];
+      }
+      
       const response = await api.getMessages({ page: 1, limit: 100 });
       
       // Extract messages list
@@ -39,6 +45,10 @@ export const useMessageNotifications = (isEnabled = true) => {
       previousMessageCountRef.current = messageUnreadCount;
       return messages;
     } catch (error) {
+      // Silently handle 401 errors (unauthenticated)
+      if (error.status === 401) {
+        return [];
+      }
       console.error('Failed to load messages:', error);
       return [];
     }
