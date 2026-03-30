@@ -150,6 +150,10 @@ class PlatformDashboardController extends Controller
                 // Get latest payment
                 $latestPayment = $company->paymentSimulations->sortByDesc('created_at')->first();
                 
+                // Get admin user email (the company owner/admin)
+                $adminUser = $company->users()->where('role', 'admin')->first();
+                $adminEmail = $adminUser ? $adminUser->email : 'N/A';
+                
                 // Build status display
                 $companyStatus = $company->company_status ?? 'registered';
                 
@@ -201,6 +205,8 @@ class PlatformDashboardController extends Controller
                     'id' => $company->id,
                     'name' => $company->name,
                     'email' => $company->email,
+                    'admin_email' => $adminEmail,
+                    'user_email' => $adminEmail,
                     'phone' => $company->phone,
                     'status' => $statusDisplay,
                     'company_status' => $companyStatus,

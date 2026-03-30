@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { FaCreditCard, FaSpinner, FaSearch, FaSync, FaCheckCircle, FaBan, FaPause, FaPlayCircle, FaInfoCircle } from 'react-icons/fa';
+import { FaCreditCard, FaSpinner, FaSearch, FaSync, FaCheckCircle, FaBan, FaPause, FaPlayCircle, FaInfoCircle, FaExclamationTriangle } from 'react-icons/fa';
 import platformApi from '../services/platformApi';
 
 /**

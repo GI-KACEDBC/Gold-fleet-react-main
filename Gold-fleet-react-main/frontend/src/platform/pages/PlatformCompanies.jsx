@@ -255,6 +255,7 @@ export default function PlatformCompanies() {
                 <div>
                   <h3 className="font-semibold text-gray-900">{company.name}</h3>
                   <p className="text-sm text-gray-600">{company.email}</p>
+                  <p className="text-sm text-blue-600 font-medium">{company.admin_email || company.user_email || 'N/A'}</p>
                 </div>
                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(company.status)}`}>
                   {company.status}
@@ -342,6 +343,7 @@ export default function PlatformCompanies() {
                 <tr className="bg-yellow-50 border-b-2 border-yellow-500">
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Company Name</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Email</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Admin Email</th>
                   <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">Status</th>
                   <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">Subscription</th>
                   <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900">Payment</th>
@@ -363,6 +365,7 @@ export default function PlatformCompanies() {
                     <tr key={company.id} className="border-b border-yellow-200 hover:bg-yellow-50 transition-colors">
                       <td className="px-6 py-4 text-gray-900 font-medium">{company.name}</td>
                       <td className="px-6 py-4 text-gray-600">{company.email}</td>
+                      <td className="px-6 py-4 text-blue-600 font-medium">{company.admin_email || company.user_email || 'N/A'}</td>
                       <td className="px-6 py-4 text-center">
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(company.company_status)}`}>
                           {company.company_status ? company.company_status.replace('_', ' ') : 'registered'}
@@ -492,8 +495,12 @@ export default function PlatformCompanies() {
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-600">Email</p>
+                  <p className="text-sm text-gray-600">Company Email</p>
                   <p className="text-lg font-semibold text-gray-900">{selectedCompany.email}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Admin User Email</p>
+                  <p className="text-lg font-semibold text-blue-700">{selectedCompany.admin_email || selectedCompany.user_email || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Company Status</p>
