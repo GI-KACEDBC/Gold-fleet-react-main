@@ -71,6 +71,7 @@ class InspectionController extends Controller
                             'company_id' => $validated['company_id'],
                             'vehicle_id' => $inspection->vehicle_id,
                             'driver_id' => $inspection->driver_id,
+                            'trip_id' => $inspection->trip_id ?? null,
                             'title' => "Inspection Failed: {$item['item_name']}",
                             'description' => $item['notes'] ?? "Vehicle inspection identified a problem with {$item['item_name']}",
                             'severity' => 'medium',
@@ -487,6 +488,63 @@ class InspectionController extends Controller
             }
         } catch (\Exception $e) {
             Log::error('Failed to notify admin of completed inspection: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get inspection by trip ID, filtering by current vehicle_id
+     * 
+     * CRITICAL: Only returns inspection if vehicle_id matches trip's current vehicle_id
+     * When admin reassigns vehicle, old inspections are automatically filtered out
+     * GET /api/trips/{id}/inspection
+     */
+    public function getByTrip(Request $request, $tripId)
+    {
+        try {
+            // Get the trip to verify it exists and get current vehicle_id
+            $trip = \App\Models\Trip::findOrFail($tripId);
+
+            // Verify authorization - user must be from same company
+            if ($trip->company_id !== auth()->user()->company_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized - trip does not belong to your company'
+                ], 403);
+            }
+
+            // Get inspection that matches BOTH trip_id AND current vehicle_id
+            // This means old inspections for previous vehicles will NOT be returned
+            $inspection = Inspection::with('vehicle', 'driver', 'driver.user', 'items')
+                ->where('trip_id', $tripId)
+                ->where('vehicle_id', $trip->vehicle_id)  // CRITICAL: Filter by current vehicle
+                ->latest('inspection_date')
+                ->first();
+
+            if (!$inspection) {
+                // No inspection found for current vehicle (old inspections are filtered out)
+                return response()->json([
+                    'success' => true,
+                    'data' => null,
+                    'message' => 'No inspection for current vehicle'
+                ], 200);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $inspection
+            ], 200);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Trip not found'
+            ], 404);
+        } catch (\Exception $e) {
+            Log::error('Error fetching inspection by trip: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch inspection'
+            ], 500);
         }
     }
 

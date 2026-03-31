@@ -235,6 +235,7 @@ Route::middleware('authorize.api.token')->group(function () {
     // Drivers can submit maintenance checklists whether or not company is approved
     Route::post('/inspections/submit-checklist', [InspectionController::class, 'submitChecklist']);
     Route::get('/inspections/pending-reviews', [InspectionController::class, 'getPendingReviews']);
+    Route::get('/trips/{tripId}/inspection', [InspectionController::class, 'getByTrip']);
     Route::patch('/inspections/{inspection}/review', [InspectionController::class, 'reviewChecklist']);
     Route::post('/inspections/{inspection}/upload-image', [InspectionController::class, 'uploadImage']);
 

@@ -103,6 +103,7 @@ class TripController extends Controller
 
     /**
      * Update the specified resource in storage.
+     * Supports both full updates and partial updates (e.g., just vehicle_id for reassignment)
      */
     public function update(Request $request, Trip $trip)
     {
@@ -110,17 +111,24 @@ class TripController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
         try {
+            \Log::info('Trip update request', [
+                'trip_id' => $trip->id,
+                'request_data' => $request->all(),
+                'current_vehicle_id' => $trip->vehicle_id,
+            ]);
+
+            // Flexible validation: allow partial updates
             $validated = $request->validate([
-                'vehicle_id' => 'required|integer|exists:vehicles,id',
-                'driver_id' => 'required|integer|exists:drivers,id',
-                'start_location' => 'required|string|max:255',
-                'end_location' => 'required|string|max:255',
-                'start_time' => 'required|date_format:Y-m-d\TH:i',
+                'vehicle_id' => 'nullable|integer|exists:vehicles,id',
+                'driver_id' => 'nullable|integer|exists:drivers,id',
+                'start_location' => 'nullable|string|max:255',
+                'end_location' => 'nullable|string|max:255',
+                'start_time' => 'nullable|date_format:Y-m-d\TH:i',
                 'end_time' => 'nullable|date_format:Y-m-d\TH:i',
-                'start_mileage' => 'required|numeric|min:0',
+                'start_mileage' => 'nullable|numeric|min:0',
                 'end_mileage' => 'nullable|numeric|min:0',
                 'distance' => 'nullable|numeric|min:0',
-                'trip_date' => 'required|date',
+                'trip_date' => 'nullable|date',
                 'status' => 'nullable|in:planned,in_progress,active,completed,cancelled',
                 'origin_lat' => 'nullable|numeric',
                 'origin_lng' => 'nullable|numeric',
@@ -128,18 +136,37 @@ class TripController extends Controller
                 'destination_lng' => 'nullable|numeric',
             ]);
 
-            $trip->update($validated);
-            return response()->json(['data' => $trip->load('vehicle', 'driver', 'driver.user')]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors(),
-            ], 422);
-        } catch (\Exception $e) {
-            \Log::error('Trip update error: ' . $e->getMessage(), [
-                'user_id' => auth()->id(),
+            // Filter out null values and update only provided fields
+            $updateData = array_filter($validated, function($value) {
+                return $value !== null;
+            });
+
+            if (!empty($updateData)) {
+                $trip->update($updateData);
+                
+                \Log::info('Trip updated successfully', [
+                    'trip_id' => $trip->id,
+                    'updated_fields' => $updateData,
+                    'new_vehicle_id' => $trip->vehicle_id,
+                ]);
+            }
+
+            // Refresh the trip and all relationships from database
+            $trip->refresh();
+            $trip->load('vehicle', 'driver', 'driver.user');
+
+            \Log::info('Trip response', [
                 'trip_id' => $trip->id,
-                'exception' => $e,
+                'vehicle_id' => $trip->vehicle_id,
+                'vehicle_loaded' => !is_null($trip->vehicle),
+            ]);
+
+            return response()->json(['data' => $trip]);
+        } catch (\Exception $e) {
+            \Log::error('Trip update error', [
+                'trip_id' => $trip->id,
+                'error' => $e->getMessage(),
+                'user_id' => auth()->id(),
             ]);
             return response()->json([
                 'success' => false,

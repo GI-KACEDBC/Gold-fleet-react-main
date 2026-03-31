@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -102,8 +102,6 @@ const vehicleIcon = L.divIcon({
 export default function DriverDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { successMessage: incomingSuccessMessage = null, currentTrip: incomingTrip = null, activeTab: incomingTab = null } = location.state || {};
   const [vehicle, setVehicle] = useState(null);
   const [currentTrip, setCurrentTrip] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -149,28 +147,6 @@ export default function DriverDashboard() {
       setSidebarOpen(false);
     }
   }, [windowSize.width]);
-
-  // Handle state from maintenance checklist completion
-  useEffect(() => {
-    if (incomingSuccessMessage) {
-      setSuccessMessage(incomingSuccessMessage);
-      if (incomingTrip) {
-        setCurrentTrip(incomingTrip);
-      }
-      if (incomingTab) {
-        setActiveTab(incomingTab);
-      } else if (incomingTrip) {
-        setActiveTab('overview');
-      }
-
-      // Auto-dismiss success message after 5 seconds
-      const timer = setTimeout(() => {
-        setSuccessMessage(null);
-      }, 5000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [incomingSuccessMessage, incomingTrip, incomingTab]);
 
   // Update trip duration every minute
   useEffect(() => {

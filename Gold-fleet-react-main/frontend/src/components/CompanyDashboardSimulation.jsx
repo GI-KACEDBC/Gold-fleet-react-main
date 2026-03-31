@@ -3,20 +3,21 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap 
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { tripSimulationService } from '../services/tripSimulationService';
+import { createRotatingCarIcon, createLocationMarker, createVehicleStatusMarker } from '../utils/mapIcons';
 
 /**
  * CompanyDashboardSimulation
  * 
  * Displays all active trips as moving markers on a Leaflet map.
  * Updates vehicle positions in real-time (every 3-5 seconds).
- * 
  * Features:
- * - ✅ Display all active trips with vehicle markers
- * - ✅ Show trip origin/destination markers
- * - ✅ Animate markers as locations update
+ * - ✅ Display all active trips with vehicle markers and rotating car icons
+ * - ✅ Show trip origin/destination markers using provided coordinates
+ * - ✅ Animate markers as locations update with smooth transitions
  * - ✅ Filter trips by status (pending, active, completed)
  * - ✅ Show trip details in popup
- * - ✅ Real-time location updates
+ * - ✅ Real-time location updates with bearing/direction
+ * - ✅ Uses CartoDB tiles for company dashboard (alternative API)
  */
 export default function CompanyDashboardSimulation() {
   const [trips, setTrips] = useState([]);
@@ -25,6 +26,7 @@ export default function CompanyDashboardSimulation() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshInterval, setRefreshInterval] = useState(5000); // 5 seconds
+  const [autoStarted, setAutoStarted] = useState(new Set());
 
   /**
    * Fetch all active trips from the API.
@@ -54,11 +56,22 @@ export default function CompanyDashboardSimulation() {
       const response = await tripSimulationService.getTripLocations(tripId);
       if (response.success) {
         setTrips(prev => prev.map(t => t.id === tripId ? response.trip : t));
+        
+        // Auto-start simulation for approved trips
+        const trip = response.trip;
+        if (trip.status === 'approved' && !trip.simulation?.is_active && !autoStarted.has(tripId)) {
+          try {
+            await tripSimulationService.approveTrip(tripId);
+            setAutoStarted(prev => new Set([...prev, tripId]));
+          } catch (err) {
+            console.log(`Could not auto-start trip ${tripId}:`, err.message);
+          }
+        }
       }
     } catch (err) {
       console.error('Error fetching trip details:', err);
     }
-  }, []);
+  }, [autoStarted]);
 
   /**
    * Set up polling to fetch trips and details periodically.
@@ -95,71 +108,8 @@ export default function CompanyDashboardSimulation() {
   /**
    * Create custom marker icon for vehicle based on status.
    */
-  const createVehicleMarker = (status) => {
-    const colors = {
-      pending: '#9ca3af',    // gray
-      approved: '#3b82f6',   // blue
-      active: '#22c55e',     // green
-      completed: '#8b5cf6'   // purple
-    };
-
-    const color = colors[status] || '#9ca3af';
-
-    return L.divIcon({
-      html: `
-        <div style="
-          width: 40px;
-          height: 40px;
-          background-color: ${color};
-          border: 3px solid white;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-          font-weight: bold;
-          color: white;
-          font-size: 12px;
-        ">
-          🚗
-        </div>
-      `,
-      className: 'vehicle-marker',
-      iconSize: [40, 40],
-      iconAnchor: [20, 20],
-      popupAnchor: [0, -20]
-    });
-  };
-
-  /**
-   * Create marker icon for route endpoints.
-   */
-  const createEndpointMarker = (type) => {
-    const icon = type === 'origin' ? '📍' : '🎯';
-    const color = type === 'origin' ? '#10b981' : '#ef4444';
-
-    return L.divIcon({
-      html: `
-        <div style="
-          width: 32px;
-          height: 32px;
-          background-color: ${color};
-          border: 2px solid white;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-          font-size: 16px;
-        ">
-          ${icon}
-        </div>
-      `,
-      className: 'endpoint-marker',
-      iconSize: [32, 32],
-      iconAnchor: [16, 16],
-      popupAnchor: [0, -16]
-    });
+  const createVehicleMarker = (status, bearing = 0) => {
+    return createVehicleStatusMarker(status, bearing);
   };
 
   /**
@@ -263,9 +213,11 @@ export default function CompanyDashboardSimulation() {
             style={{ height: '100%' }}
             className="rounded-lg"
           >
+            {/* CartoDB tile layer for company dashboard */}
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://carto.com/attributions">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.basemaps.cartocdn.com/positron/{z}/{x}/{y}{r}.png"
+              maxZoom={19}
             />
 
             {filteredTrips.map(trip => (
@@ -284,60 +236,66 @@ export default function CompanyDashboardSimulation() {
                   />
                 )}
 
-                {/* Origin marker */}
-                <Marker
-                  position={[trip.origin.latitude, trip.origin.longitude]}
-                  icon={createEndpointMarker('origin')}
-                >
-                  <Popup>
-                    <div className="text-sm">
-                      <p className="font-bold text-green-700">📍 Origin</p>
-                      <p>{trip.origin.name || `${trip.origin.latitude.toFixed(4)}, ${trip.origin.longitude.toFixed(4)}`}</p>
-                    </div>
-                  </Popup>
-                </Marker>
-
-                {/* Current vehicle position (if simulation is active) */}
-                {trip.simulation?.is_active && trip.simulation.current_lat && (
+                {/* Origin marker with provided coordinates */}
+                {trip.origin && (
                   <Marker
-                    position={[trip.simulation.current_lat, trip.simulation.current_lng]}
-                    icon={createVehicleMarker(trip.status)}
+                    position={[trip.origin.latitude, trip.origin.longitude]}
+                    icon={createLocationMarker('origin')}
                   >
                     <Popup>
                       <div className="text-sm">
-                        <p className="font-bold">{trip.vehicle?.name || 'Vehicle'}</p>
-                        <p>Driver: {trip.driver?.name || 'Unknown'}</p>
-                        <p>Status: <span className="font-semibold capitalize">{trip.status}</span></p>
-                        <p>Progress: {trip.simulation.progress_percentage}%</p>
-                        <p>Speed: {trip.simulation.speed_kmh} km/h</p>
-                        <p>Position: {trip.simulation.current_lat.toFixed(4)}, {trip.simulation.current_lng.toFixed(4)}</p>
+                        <p className="font-bold text-green-700">📍 Origin</p>
+                        <p>{trip.origin.name || `${trip.origin.latitude.toFixed(6)}, ${trip.origin.longitude.toFixed(6)}`}</p>
                       </div>
                     </Popup>
                   </Marker>
                 )}
 
-                {/* Destination marker */}
-                <Marker
-                  position={[trip.destination.latitude, trip.destination.longitude]}
-                  icon={createEndpointMarker('destination')}
-                >
-                  <Popup>
-                    <div className="text-sm">
-                      <p className="font-bold text-red-700">🎯 Destination</p>
-                      <p>{trip.destination.name || `${trip.destination.latitude.toFixed(4)}, ${trip.destination.longitude.toFixed(4)}`}</p>
-                    </div>
-                  </Popup>
-                </Marker>
+                {/* Current vehicle position with rotating car icon (if simulation is active) */}
+                {trip.simulation?.is_active && trip.simulation.current_lat && (
+                  <Marker
+                    position={[trip.simulation.current_lat, trip.simulation.current_lng]}
+                    icon={createRotatingCarIcon(trip.simulation.heading || 0, '#22c55e')}
+                  >
+                    <Popup>
+                      <div className="text-sm font-medium space-y-1">
+                        <p className="font-bold text-blue-700">{trip.vehicle?.name || 'Vehicle'}</p>
+                        <p className="text-gray-600">Driver: {trip.driver?.name || 'Unknown'}</p>
+                        <p className="text-gray-600">Status: <span className="font-semibold capitalize">{trip.status}</span></p>
+                        <p className="text-gray-600">Progress: {Math.round(trip.simulation.progress_percentage)}%</p>
+                        <p className="text-gray-600">Speed: {trip.simulation.speed_kmh} km/h</p>
+                        <p className="text-gray-600">Direction: {Math.round(trip.simulation.heading) || 0}°</p>
+                        <p className="text-xs text-gray-500">Lat: {trip.simulation.current_lat.toFixed(6)}</p>
+                        <p className="text-xs text-gray-500">Lng: {trip.simulation.current_lng.toFixed(6)}</p>
+                      </div>
+                    </Popup>
+                  </Marker>
+                )}
+
+                {/* Destination marker with provided coordinates */}
+                {trip.destination && (
+                  <Marker
+                    position={[trip.destination.latitude, trip.destination.longitude]}
+                    icon={createLocationMarker('destination')}
+                  >
+                    <Popup>
+                      <div className="text-sm">
+                        <p className="font-bold text-red-700">🎯 Destination</p>
+                        <p>{trip.destination.name || `${trip.destination.latitude.toFixed(6)}, ${trip.destination.longitude.toFixed(6)}`}</p>
+                      </div>
+                    </Popup>
+                  </Marker>
+                )}
 
                 {/* Show progress circle at current position */}
                 {trip.simulation?.is_active && trip.simulation.current_lat && (
                   <CircleMarker
                     center={[trip.simulation.current_lat, trip.simulation.current_lng]}
-                    radius={8}
+                    radius={6}
                     fillColor={trip.status === 'active' ? '#22c55e' : '#3b82f6'}
                     color="white"
                     weight={2}
-                    opacity={0.5}
+                    opacity={0.3}
                   />
                 )}
               </React.Fragment>

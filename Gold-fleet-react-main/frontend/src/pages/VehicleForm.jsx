@@ -128,8 +128,6 @@ export default function VehicleForm() {
     // Validate form and make/model
     if (!form.isValid || !make || !model) {
       form.setAllTouched();
-      if (!make) form.setFieldTouched('make');
-      if (!model) form.setFieldTouched('model');
       setError('Please correct the errors below and try again.');
       return;
     }

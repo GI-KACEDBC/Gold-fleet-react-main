@@ -362,7 +362,7 @@ class TripSimulationController extends Controller
             $trip = Trip::where('driver_id', $driver->id)
                 ->whereIn('status', ['pending', 'approved', 'active', 'completed'])
                 ->latest('created_at')
-                ->with('simulation')
+                ->with('vehicle', 'driver', 'driver.user', 'simulation')
                 ->first();
 
             if (!$trip) {
@@ -409,7 +409,12 @@ class TripSimulationController extends Controller
             'vehicle' => $trip->vehicle ? [
                 'id' => $trip->vehicle->id,
                 'name' => $trip->vehicle->name,
+                'make' => $trip->vehicle->make,
+                'model' => $trip->vehicle->model,
+                'year' => $trip->vehicle->year,
                 'license_plate' => $trip->vehicle->license_plate,
+                'type' => $trip->vehicle->type,
+                'status' => $trip->vehicle->status,
             ] : null,
             'driver' => $trip->driver ? [
                 'id' => $trip->driver->id,

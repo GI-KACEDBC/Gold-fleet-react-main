@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap 
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { tripSimulationService } from '../services/tripSimulationService';
+import { createRotatingCarIcon, createLocationMarker, createCurrentPositionMarker } from '../utils/mapIcons';
 
 /**
  * DriverDashboardSimulation
@@ -11,12 +12,13 @@ import { tripSimulationService } from '../services/tripSimulationService';
  * Shows the planned route and allows the driver to approve/start the simulation.
  * 
  * Features:
- * - ✅ Display assigned trip route (origin to destination)
- * - ✅ Show current vehicle position on map
- * - ✅ Button to approve trip and start simulation
- * - ✅ Real-time location updates during active simulation
- * - ✅ Show trip progress percentage
+ * - ✅ Display assigned trip route using provided coordinates (origin/destination)
+ * - ✅ Show current vehicle position on map with rotating car icon
+ * - ✅ Button to approve trip and auto-start simulation
+ * - ✅ Real-time location updates during active simulation with bearing/direction
+ * - ✅ Show trip progress percentage and metrics
  * - ✅ Display estimated arrival and metrics
+ * - ✅ Uses USGS tiles for driver dashboard (alternative API)
  */
 export default function DriverDashboardSimulation() {
   const [trip, setTrip] = useState(null);
@@ -26,6 +28,7 @@ export default function DriverDashboardSimulation() {
   const [approving, setApproving] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [autoStarted, setAutoStarted] = useState(false);
 
   /**
    * Fetch driver's assigned trip.
@@ -38,6 +41,20 @@ export default function DriverDashboardSimulation() {
         setTrip(response.trip);
         setSimulation(response.simulation);
         setError(null);
+        
+        // Auto-start simulation for approved trips
+        if (response.trip && response.trip.status === 'approved' && !response.simulation?.is_active && !autoStarted) {
+          try {
+            const approveResponse = await tripSimulationService.approveTrip(response.trip.id);
+            if (approveResponse.success) {
+              setTrip(approveResponse.trip);
+              setSimulation(approveResponse.simulation);
+              setAutoStarted(true);
+            }
+          } catch (err) {
+            console.log('Could not auto-start trip:', err.message);
+          }
+        }
       } else {
         setError(response.message || 'Failed to fetch trip');
       }
@@ -46,7 +63,7 @@ export default function DriverDashboardSimulation() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [autoStarted]);
 
   /**
    * Approve trip and start simulation.
@@ -202,12 +219,14 @@ export default function DriverDashboardSimulation() {
             zoom={13}
             style={{ height: '100%', minHeight: '500px' }}
           >
+            {/* USGS tile layer for driver dashboard */}
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.usgs.gov/">USGS</a>'
+              url="https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}"
+              maxZoom={16}
             />
 
-            {/* Route polyline */}
+            {/* Route polyline from origin to destination */}
             {trip.origin && trip.destination && (
               <Polyline
                 positions={[
@@ -220,121 +239,61 @@ export default function DriverDashboardSimulation() {
               />
             )}
 
-            {/* Origin marker */}
+            {/* Origin marker with provided coordinates */}
             {trip.origin && (
               <Marker
                 position={[trip.origin.latitude, trip.origin.longitude]}
-                icon={L.divIcon({
-                  html: `
-                    <div style="
-                      width: 36px;
-                      height: 36px;
-                      background-color: #10b981;
-                      border: 3px solid white;
-                      border-radius: 50%;
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-                      font-size: 18px;
-                    ">
-                      📍
-                    </div>
-                  `,
-                  iconSize: [36, 36],
-                  iconAnchor: [18, 18],
-                  popupAnchor: [0, -18]
-                })}
+                icon={createLocationMarker('origin')}
               >
                 <Popup>
                   <div className="text-sm">
-                    <p className="font-bold text-green-700">Start Location</p>
-                    <p>{trip.origin.name || `${trip.origin.latitude.toFixed(4)}, ${trip.origin.longitude.toFixed(4)}`}</p>
+                    <p className="font-bold text-green-700">📍 Start Location</p>
+                    <p>{trip.origin.name || `${trip.origin.latitude.toFixed(6)}, ${trip.origin.longitude.toFixed(6)}`}</p>
                   </div>
                 </Popup>
               </Marker>
             )}
 
-            {/* Current position (during simulation) */}
+            {/* Current position with rotating car icon (during simulation) */}
             {simulation?.current_lat && (
               <>
                 <Marker
                   position={[simulation.current_lat, simulation.current_lng]}
-                  icon={L.divIcon({
-                    html: `
-                      <div style="
-                        width: 44px;
-                        height: 44px;
-                        background-color: #3b82f6;
-                        border: 3px solid white;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                        font-size: 20px;
-                      ">
-                        🚗
-                      </div>
-                    `,
-                    iconSize: [44, 44],
-                    iconAnchor: [22, 22],
-                    popupAnchor: [0, -22]
-                  })}
+                  icon={createRotatingCarIcon(simulation.heading || 0, '#3b82f6')}
                 >
                   <Popup>
-                    <div className="text-sm">
-                      <p className="font-bold">📍 Your Location</p>
-                      <p>Lat: {simulation.current_lat.toFixed(6)}</p>
-                      <p>Lng: {simulation.current_lng.toFixed(6)}</p>
-                      <p>Speed: {simulation.speed_kmh} km/h</p>
-                      <p>Heading: {simulation.heading}°</p>
+                    <div className="text-sm font-medium space-y-1">
+                      <p className="font-bold text-blue-700">📍 Your Location</p>
+                      <p className="text-gray-600">Lat: {simulation.current_lat.toFixed(6)}</p>
+                      <p className="text-gray-600">Lng: {simulation.current_lng.toFixed(6)}</p>
+                      <p className="text-gray-600">Speed: {simulation.speed_kmh} km/h</p>
+                      <p className="text-gray-600">Direction: {Math.round(simulation.heading) || 0}°</p>
                     </div>
                   </Popup>
                 </Marker>
 
-                {/* Accuracy circle */}
+                {/* Accuracy/signal circle around current position */}
                 <CircleMarker
                   center={[simulation.current_lat, simulation.current_lng]}
-                  radius={10}
+                  radius={8}
                   fillColor="#3b82f6"
                   color="white"
                   weight={2}
-                  opacity={0.3}
+                  opacity={0.2}
                 />
               </>
             )}
 
-            {/* Destination marker */}
+            {/* Destination marker with provided coordinates */}
             {trip.destination && (
               <Marker
                 position={[trip.destination.latitude, trip.destination.longitude]}
-                icon={L.divIcon({
-                  html: `
-                    <div style="
-                      width: 36px;
-                      height: 36px;
-                      background-color: #ef4444;
-                      border: 3px solid white;
-                      border-radius: 50%;
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-                      font-size: 18px;
-                    ">
-                      🎯
-                    </div>
-                  `,
-                  iconSize: [36, 36],
-                  iconAnchor: [18, 18],
-                  popupAnchor: [0, -18]
-                })}
+                icon={createLocationMarker('destination')}
               >
                 <Popup>
                   <div className="text-sm">
-                    <p className="font-bold text-red-700">Destination</p>
-                    <p>{trip.destination.name || `${trip.destination.latitude.toFixed(4)}, ${trip.destination.longitude.toFixed(4)}`}</p>
+                    <p className="font-bold text-red-700">🎯 Destination</p>
+                    <p>{trip.destination.name || `${trip.destination.latitude.toFixed(6)}, ${trip.destination.longitude.toFixed(6)}`}</p>
                   </div>
                 </Popup>
               </Marker>

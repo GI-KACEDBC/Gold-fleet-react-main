@@ -38,6 +38,10 @@ export default function DriverMaintenanceChecklist() {
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
+  // Advanced workflow prevention
+  const submissionRef = useRef(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [completionDetails, setCompletionDetails] = useState(null);
 
   // Load vehicles when component mounts
   useEffect(() => {
@@ -175,70 +179,158 @@ export default function DriverMaintenanceChecklist() {
     setImagePreview('');
   };
 
+  // Validate inspection completion (all items must be marked as either OK or Spoilt)
+  const validateInspectionCompletion = () => {
+    const incompleteItems = formData.checklist_items.filter(
+      item => !item.checked && !item.is_spoilt
+    );
+    return incompleteItems;
+  };
+
+  // Transform checklist items to API format and detect issues
+  const prepareInspectionData = () => {
+    const items = formData.checklist_items.map((item) => ({
+      item_name: item.name,
+      status: item.is_spoilt ? 'fail' : 'ok',
+      notes: item.notes || '',
+    }));
+
+    const spoiltItems = formData.checklist_items.filter(item => item.is_spoilt);
+    const hasFailures = spoiltItems.length > 0;
+
+    return {
+      items,
+      spoiltItems,
+      hasFailures,
+    };
+  };
+
+  // Create issue reports for spoilt parts
+  const reportSpoiltParts = async (inspectionId) => {
+    try {
+      const { spoiltItems } = prepareInspectionData();
+      
+      if (spoiltItems.length === 0) return { success: true, issueCount: 0 };
+
+      const issuesCreated = [];
+      
+      for (const item of spoiltItems) {
+        try {
+          const issueData = {
+            vehicle_id: formData.vehicle_id,
+            trip_id: formData.trip_id,
+            title: `🔴 Pre-Trip Inspection Issue: ${item.name}`,
+            description: `Driver reported ${item.name} is spoilt/damaged during pre-trip inspection.${item.notes ? `\n\nDriver Notes: ${item.notes}` : ''}`,
+            severity: 'high',
+            priority: 'high',
+            status: 'open',
+            reported_by: 'driver_inspection',
+            inspection_id: inspectionId,
+          };
+          
+          const response = await api.createIssue(issueData);
+          if (response.data?.id) {
+            issuesCreated.push(response.data);
+            console.log('✓ Issue created:', response.data.id);
+          }
+        } catch (issueErr) {
+          console.error(`Failed to create issue for ${item.name}:`, issueErr);
+        }
+      }
+
+      return { success: true, issueCount: issuesCreated.length };
+    } catch (err) {
+      console.error('Error in reportSpoiltParts:', err);
+      return { success: false, issueCount: 0, error: err };
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Advanced workflow prevention - prevent double submission
+    if (isSubmitting || submissionRef.current) {
+      console.warn('Submission already in progress...');
+      return;
+    }
+
+    // Validate inspection completion
+    const incompleteItems = validateInspectionCompletion();
+    if (incompleteItems.length > 0) {
+      setError(
+        `Please complete all inspections. Incomplete items: ${incompleteItems.map(i => i.name).join(', ')}`
+      );
+      return;
+    }
+
     setError('');
     setSuccess('');
     setLoading(true);
+    setIsSubmitting(true);
+    submissionRef.current = true;
 
     if (!formData.vehicle_id) {
       setError('Please select a vehicle');
       setLoading(false);
-      return;
-    }
-
-    // Validate that all items are checked or marked as spoilt
-    const uncheckedItems = formData.checklist_items.filter(
-      item => !item.checked && !item.is_spoilt
-    );
-
-    if (uncheckedItems.length > 0) {
-      setError(
-        `Please inspect all items. Incomplete items: ${uncheckedItems.map(item => item.name).join(', ')}`
-      );
-      setLoading(false);
+      setIsSubmitting(false);
+      submissionRef.current = null;
       return;
     }
 
     try {
-      // Transform frontend data to backend format
-      const inspectionData = {
+      // Prepare inspection data
+      const { items, spoiltItems, hasFailures } = prepareInspectionData();
+      
+      const inspectionPayload = {
         vehicle_id: formData.vehicle_id,
         trip_id: formData.trip_id,
-        notes: formData.notes,
-        items: formData.checklist_items.map(item => ({
-          item_name: item.name,
-          status: item.is_spoilt ? 'fail' : 'pass',
-          notes: item.notes || null,
-        })),
+        inspection_date: new Date().toISOString().split('T')[0],
+        notes: formData.notes || 'Pre-trip vehicle inspection completed',
+        items: items,
+        result: hasFailures ? 'fail' : 'pass',
+        status: hasFailures ? 'failed' : 'passed',
       };
 
-      // Submit the maintenance checklist
-      const response = await api.submitMaintenanceChecklist(inspectionData);
+      // Submit inspection
+      const response = await api.submitMaintenanceChecklist(inspectionPayload);
       const inspectionId = response.data?.id;
 
-      // Check if there are any spoilt items
-      const spoiltItems = formData.checklist_items.filter(item => item.is_spoilt);
-      let issueNotification = '';
-
-      if (spoiltItems.length > 0) {
-        issueNotification = `⚠️ ${spoiltItems.length} issue(s) detected: ${spoiltItems.map(item => item.name).join(', ')}. Your admin has been notified.`;
-      }
+      console.log('✓ Inspection submitted:', inspectionId);
 
       // Upload image if selected
       if (selectedImage && inspectionId) {
         try {
           await api.uploadInspectionImage(inspectionId, selectedImage);
+          console.log('✓ Inspection image uploaded');
         } catch (imageErr) {
-          console.error('Image upload failed:', imageErr);
+          console.warn('Image upload failed (non-critical):', imageErr);
         }
       }
 
-      // Show success message
-      const successMsg = spoiltItems.length > 0
-        ? `Vehicle inspection completed! ${issueNotification}`
-        : 'Vehicle inspection completed successfully! You can now proceed with your trip.';
+      // Report spoilt parts to admin if any
+      let issueReportResult = { success: true, issueCount: 0 };
+      if (hasFailures) {
+        issueReportResult = await reportSpoiltParts(inspectionId);
+      }
 
+      // Prepare completion details
+      const completionInfo = {
+        inspectionId,
+        hasFailures,
+        failureCount: spoiltItems.length,
+        issuesReported: issueReportResult.issueCount,
+        vehicleInfo: selectedVehicle || fromTrip?.vehicle,
+      };
+      setCompletionDetails(completionInfo);
+
+      // Build success message
+      let successMsg = '✓ Vehicle inspection completed successfully!';
+      if (hasFailures) {
+        successMsg += `\n⚠ ${spoiltItems.length} issue(s) found and reported to your company admin.`;
+        successMsg += `\n📋 Issues created: ${issueReportResult.issueCount}`;
+      }
+      successMsg += '\n🚗 Redirecting to trip overview...';
+      
       setSuccess(successMsg);
 
       // Reset form
@@ -251,35 +343,42 @@ export default function DriverMaintenanceChecklist() {
       setSelectedImage(null);
       setImagePreview('');
 
-      // Redirect after 2 seconds
+      // Redirect after 2.5 seconds
       setTimeout(() => {
         if (fromTrip) {
-          // Return to driver dashboard with trip data to show overview map
-          navigate('/driver/dashboard', {
-            state: {
-              successMessage: successMsg,
-              currentTrip: fromTrip,
-              activeTab: 'overview'
+          // Return to trip overview/map with completion context
+          navigate('/driver/dashboard', { 
+            state: { 
+              selectedTrip: fromTrip,
+              inspectionCompleted: true,
+              inspectionStatus: hasFailures ? 'completed_with_issues' : 'passed',
+              successMessage: hasFailures 
+                ? `Vehicle inspected with ${spoiltItems.length} issue(s). Issues reported to admin.`
+                : 'Vehicle pre-trip inspection passed! Ready to proceed.'
             }
           });
         } else {
           navigate('/driver/dashboard');
         }
-      }, 2000);
+      }, 2500);
     } catch (err) {
+      console.error('Inspection submission error:', err);
       setError(
         err.response?.data?.message ||
         err.message ||
-        'Failed to submit checklist'
+        'Failed to submit inspection. Please try again.'
       );
     } finally {
       setLoading(false);
+      setIsSubmitting(false);
+      submissionRef.current = null;
     }
   };
 
   const checkedCount = formData.checklist_items.filter(item => item.checked || item.is_spoilt).length;
   const totalItems = formData.checklist_items.length;
   const completionPercentage = totalItems > 0 ? Math.round((checkedCount / totalItems) * 100) : 0;
+  const spoiltItemsCount = formData.checklist_items.filter(item => item.is_spoilt).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 py-8 px-4">
@@ -421,6 +520,22 @@ export default function DriverMaintenanceChecklist() {
                   style={{ width: `${completionPercentage}%` }}
                 />
               </div>
+              
+              {/* Issues Summary */}
+              {spoiltItemsCount > 0 && (
+                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
+                  <p className="text-sm font-semibold text-red-700">
+                    ⚠ {spoiltItemsCount} issue(s) detected - Will be reported to admin
+                  </p>
+                  <div className="text-xs text-red-600 mt-1 space-y-1">
+                    {formData.checklist_items
+                      .filter(item => item.is_spoilt)
+                      .map((item, idx) => (
+                        <p key={idx}>• {item.name} {item.notes ? `- ${item.notes}` : ''}</p>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Checklist Items */}
@@ -597,29 +712,69 @@ export default function DriverMaintenanceChecklist() {
               <button
                 type="button"
                 onClick={() => navigate('/driver/dashboard')}
-                className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
+                disabled={loading}
+                className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={loading || !formData.vehicle_id}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg font-semibold hover:from-yellow-600 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                disabled={loading || isSubmitting || !formData.vehicle_id || completionPercentage < 100}
+                className={`flex-1 px-6 py-3 rounded-lg font-semibold text-white transition ${
+                  completionPercentage < 100
+                    ? 'bg-gray-300 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
-                {loading ? 'Submitting...' : 'Submit Checklist'}
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="inline-block animate-spin">⏳</span>
+                    Submitting...
+                  </span>
+                ) : completionPercentage < 100 ? (
+                  `Complete Inspection (${completionPercentage}%)`
+                ) : isSubmitting ? (
+                  'Processing...'
+                ) : (
+                  `✓ Submit Inspection ${spoiltItemsCount > 0 ? `(${spoiltItemsCount} issues)` : ''}`
+                )}
               </button>
             </div>
           </div>
         </form>
 
         {/* Info Box */}
-        <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
-          <h3 className="font-semibold text-blue-900 mb-2">What happens next?</h3>
-          <ul className="text-blue-800 text-sm space-y-2">
-            <li>✓ Your checklist will be submitted to your company admin</li>
-            <li>✓ A notification will be sent to all admins immediately</li>
-            <li>✓ Admins will review and provide feedback</li>
-            <li>✓ You'll receive a notification when the review is complete</li>
+        <div className={`mt-8 p-6 rounded-lg ${
+          spoiltItemsCount > 0
+            ? 'bg-red-50 border border-red-200'
+            : 'bg-blue-50 border border-blue-200'
+        }`}>
+          <h3 className={`font-semibold mb-2 ${
+            spoiltItemsCount > 0 ? 'text-red-900' : 'text-blue-900'
+          }`}>
+            {spoiltItemsCount > 0 ? '⚠ Issues Detected - Workflow' : '✓ Inspection Workflow'}
+          </h3>
+          <ul className={`text-sm space-y-2 ${
+            spoiltItemsCount > 0 ? 'text-red-800' : 'text-blue-800'
+          }`}>
+            {spoiltItemsCount > 0 ? (
+              <>
+                <li>🔴 {spoiltItemsCount} part(s) marked as spoilt/damaged</li>
+                <li>📢 Automatically creating issue report(s) for your admin</li>
+                <li>🔔 Admin will receive real-time notification</li>
+                <li>📋 Issues will have HIGH priority and require immediate attention</li>
+                <li>👤 You can still proceed with the trip</li>
+                <li>💬 Admin may contact you about the reported issues</li>
+              </>
+            ) : (
+              <>
+                <li>✓ Inspection will be submitted to your company admin</li>
+                <li>✓ All parts verified as working correctly</li>
+                <li>✓ Quick notification sent to admins</li>
+                <li>✓ You may proceed with your trip</li>
+                <li>✓ Redirecting to trip overview after submission</li>
+              </>
+            )}
           </ul>
         </div>
       </div>

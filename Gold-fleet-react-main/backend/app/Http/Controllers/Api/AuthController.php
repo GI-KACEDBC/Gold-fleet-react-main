@@ -13,15 +13,16 @@ use Illuminate\Support\Facades\DB;
 class AuthController extends Controller
 {
     /**
-     * Handle DRIVER login and return API token.
-     * ONLY allows drivers (role='driver') to login via this endpoint.
-     * Company admins must use the /api/company-admin-login endpoint.
+     * Handle unified login for both drivers and company admins.
+     * Accepts any user with valid credentials.
+     * User type is determined by the 'user_type' field (driver or company).
+     * Drivers are company-specific via company_id and user_type='driver'.
      * 
      * NOTE: Email verification is NOT required - removed to simplify login flow.
      */
     public function login(Request $request): JsonResponse
     {
-        \Illuminate\Support\Facades\Log::channel('auth')->info('=== LOGIN ATTEMPT (/api/login) ===', [
+        \Illuminate\Support\Facades\Log::channel('auth')->info('=== LOGIN ATTEMPT ===', [
             'email' => $request->input('email'),
             'ip_address' => $request->ip(),
             'timestamp' => now()->format('Y-m-d H:i:s'),
@@ -46,26 +47,6 @@ class AuthController extends Controller
                 'message' => 'Invalid credentials',
                 'reason' => 'Email or password is incorrect',
             ], 401);
-        }
-
-        // Verify driver has a driver profile with an assigned ID
-        $driver = $user->driver;
-        if (!$driver) {
-            \Illuminate\Support\Facades\Log::channel('auth')->warning('DRIVER LOGIN FAILED: No driver profile found', [
-                'email' => $credentials['email'],
-                'user_id' => $user->id,
-                'ip_address' => $request->ip(),
-                'message' => 'User is marked as driver but has no driver profile assigned.',
-                'timestamp' => now()->format('Y-m-d H:i:s'),
-                'channel' => 'DRIVER_LOGIN',
-            ]);
-            
-            return response()->json([
-                'success' => false,
-                'message' => 'Driver profile not found',
-                'reason' => 'Your account is marked as a driver but no driver profile has been assigned yet.',
-                'action_required' => 'contact_support',
-            ], 403);
         }
 
         // Generate API token
@@ -90,6 +71,7 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
+                'user_type' => $user->user_type, // 'driver' or 'company' - determines user type
                 'company_id' => $user->company_id,
                 'account_status' => $user->account_status,
                 'email_verified' => true,
@@ -105,13 +87,13 @@ class AuthController extends Controller
     }
 
     /**
-     * Handle COMPANY ADMIN login and return API token.
-     * ONLY allows company admins (role='admin') to login via this endpoint.
-     * Drivers must use the /api/login endpoint.
+     * Handle COMPANY ADMIN login - alternative endpoint.
+     * Accepts company admins (user_type='company' AND role='admin').
+     * Both /api/login and /api/company-admin-login work for admins.
      */
     public function companyAdminLogin(Request $request): JsonResponse
     {
-        \Illuminate\Support\Facades\Log::channel('auth')->info('=== LOGIN ATTEMPT (/api/company-admin-login) ===', [
+        \Illuminate\Support\Facades\Log::channel('auth')->info('=== LOGIN ATTEMPT ===', [
             'email' => $request->input('email'),
             'ip_address' => $request->ip(),
             'timestamp' => now()->format('Y-m-d H:i:s'),
@@ -146,6 +128,7 @@ class AuthController extends Controller
             'user_id' => $user->id,
             'email' => $user->email,
             'role' => $user->role,
+            'user_type' => $user->user_type,
             'company_id' => $user->company_id,
             'ip_address' => $request->ip(),
             'timestamp' => now()->format('Y-m-d H:i:s'),
@@ -160,6 +143,7 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
+                'user_type' => $user->user_type, // 'driver' or 'company' - determines user type
                 'company_id' => $user->company_id,
                 'account_status' => $user->account_status,
                 'email_verified' => true,
