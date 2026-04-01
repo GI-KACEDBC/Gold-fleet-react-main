@@ -100,29 +100,42 @@ export default function IssueDetail() {
       console.log('   Old Vehicle ID:', issue?.vehicle_id);
       console.log('   New Vehicle ID:', newVehicleId);
 
-      // Step 1: Get driver_id - first from issue, then try to fetch from trip
-      let driverId = issue?.driver_id || null;
-      if (!driverId && issue?.trip_id) {
+      // Step 1: Make sure we have trip_id (required for reassignment to work)
+      let tripId = issue?.trip_id;
+      
+      // If no trip_id, try to find it
+      if (!tripId && issue?.driver_id && issue?.vehicle_id) {
         try {
-          const tripResponse = await api.getTrip(issue.trip_id);
-          const trip = tripResponse.data || tripResponse;
-          driverId = trip.driver_id;
-          console.log('   Driver ID from trip:', driverId);
+          const tripsResponse = await api.get('/api/trips');
+          const allTrips = tripsResponse.data || [];
+          const activeTrip = allTrips.find(t => 
+            t.driver_id === issue.driver_id && 
+            t.vehicle_id === issue.vehicle_id &&
+            ['pending', 'approved', 'active'].includes(t.status)
+          );
+          if (activeTrip) {
+            tripId = activeTrip.id;
+            console.log('✅ Found matching trip:', tripId);
+          }
         } catch (err) {
-          console.warn('Could not fetch trip details:', err);
+          console.warn('Could not search for trip:', err);
         }
-      } else if (driverId) {
-        console.log('   Driver ID from issue:', driverId);
+      }
+      
+      if (!tripId) {
+        console.warn('⚠️  No trip_id found - reassignment will still work but trip may not update');
+      } else {
+        console.log('✅ Trip ID confirmed:', tripId);
       }
 
       // Step 2: Update trip with new vehicle (if trip exists)
-      if (issue?.trip_id) {
+      if (tripId) {
         try {
           console.log('📤 Sending update request to server:');
-          console.log('   URL: PUT /api/trips/' + issue.trip_id);
+          console.log('   URL: PUT /api/trips/' + tripId);
           console.log('   Payload:', { vehicle_id: newVehicleId });
           
-          const updateResponse = await api.updateTrip(issue.trip_id, {
+          const updateResponse = await api.updateTrip(tripId, {
             vehicle_id: newVehicleId,
           });
           
@@ -156,10 +169,23 @@ export default function IssueDetail() {
           throw err;
         }
       } else {
-        console.log('⚠️  No trip linked to this issue - will only update driver vehicle');
+        console.log('⚠️  No trip ID available');
       }
 
-      // Step 3: Update driver's assigned vehicle in the driver API
+      // Step 3: Get driver info from trip if available (for update)
+      let driverId = null;
+      if (tripId) {
+        try {
+          const tripResponse = await api.getTrip(tripId);
+          const trip = tripResponse.data || tripResponse;
+          driverId = trip.driver_id;
+          console.log('   Driver ID from trip:', driverId);
+        } catch (err) {
+          console.warn('Could not fetch trip details for driver update:', err);
+        }
+      }
+
+      // Step 4: Update driver's assigned vehicle in the driver API (optional, trip is primary)
       if (driverId) {
         try {
           await api.updateDriver(driverId, {
@@ -167,16 +193,16 @@ export default function IssueDetail() {
           });
           console.log('✅ Driver vehicle assignment updated in database');
         } catch (err) {
-          console.warn('Could not update driver vehicle:', err);
+          console.warn('Could not update driver vehicle (non-critical):', err);
         }
       }
 
-      // Step 4: Create a log entry documenting the vehicle reassignment
+      // Step 5: Create a log entry documenting the vehicle reassignment
       await api.createIssue({
         title: `🔧 Vehicle Re-assignment: ${newVehicle?.make} ${newVehicle?.model}`,
-        description: `Original issue: ${issue?.title}\n\nAdmin reassigned the driver to a different vehicle.\n\nNew Vehicle: ${newVehicle?.make} ${newVehicle?.model} (${newVehicle?.license_plate})\n\nDriver ID: ${driverId}`,
+        description: `Original issue: ${issue?.title}\n\nAdmin reassigned the driver to a different vehicle.\n\nNew Vehicle: ${newVehicle?.make} ${newVehicle?.model} (${newVehicle?.license_plate})\n\nTrip ID: ${tripId}`,
         vehicle_id: newVehicleId,
-        trip_id: issue?.trip_id || null,
+        trip_id: tripId || null,
         severity: 'medium',
         priority: 'medium',
         status: 'closed',
@@ -184,10 +210,9 @@ export default function IssueDetail() {
       });
       console.log('✅ Reassignment log created');
 
-      // Step 5: Store reassignment notification for the driver
+      // Step 6: Store reassignment notification for the driver (keyed by trip_id)
       const reassignment = {
-        tripId: issue?.trip_id,
-        driverId: driverId,
+        tripId: tripId,
         oldVehicleId: issue?.vehicle_id,
         newVehicleId: newVehicleId,
         newVehicle: {
@@ -203,7 +228,7 @@ export default function IssueDetail() {
       reassignments.push(reassignment);
       localStorage.setItem('vehicleReassignments', JSON.stringify(reassignments));
       
-      console.log('📦 Reassignment stored for driver notification:', reassignment);
+      console.log('📦 Reassignment stored for driver notification (Trip ID: %s):', tripId, reassignment);
       
       // Refresh the issue data
       await fetchIssueData();

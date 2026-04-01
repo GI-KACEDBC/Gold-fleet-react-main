@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FaCheckCircle, FaTimesCircle, FaPlus, FaTrash, FaImage, FaTimes } from 'react-icons/fa';
 import { api } from '../services/api';
@@ -33,6 +33,7 @@ export default function DriverMaintenanceChecklist() {
     checklist_items: DEFAULT_ITEMS,
     notes: '',
     trip_id: tripId || null,
+    driver_id: fromTrip?.driver_id || null,
   });
   const [vehicles, setVehicles] = useState([]);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
@@ -42,20 +43,59 @@ export default function DriverMaintenanceChecklist() {
   const submissionRef = useRef(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completionDetails, setCompletionDetails] = useState(null);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
 
   // Load vehicles when component mounts
   useEffect(() => {
     loadVehicles();
+    loadCurrentDriver();
   }, [vehicleId]);
+
+  // Fetch current driver info (for driver_id fallback)
+  const loadCurrentDriver = async () => {
+    try {
+      console.log('🔎 Fetching current driver info...');
+      const driversResponse = await api.getDrivers();
+      const drivers = driversResponse.data || [];
+      console.log('📦 Drivers fetched:', drivers.length, 'drivers');
+      
+      if (drivers.length > 0) {
+        // Use first driver or try to match with auth user
+        const currentDriver = drivers[0];
+        console.log('✓ Current driver loaded:', {
+          id: currentDriver.id,
+          name: currentDriver.name || 'Unknown'
+        });
+        
+        setFormData(prev => {
+          const updated = {
+            ...prev,
+            driver_id: prev.driver_id || currentDriver.id,
+          };
+          console.log('   formData updated with driver_id:', updated.driver_id);
+          return updated;
+        });
+      } else {
+        console.warn('⚠️  No drivers found in API response');
+      }
+    } catch (err) {
+      console.error('❌ Could not load current driver:', err);
+    }
+  };
 
   // If trip has vehicle data embedded, use it immediately
   useEffect(() => {
-    if (fromTrip?.vehicle && !selectedVehicle) {
-      setSelectedVehicle(fromTrip.vehicle);
+    if (fromTrip) {
       setFormData(prev => ({
         ...prev,
-        vehicle_id: String(fromTrip.vehicle.id),
+        vehicle_id: fromTrip.vehicle?.id ? String(fromTrip.vehicle.id) : prev.vehicle_id,
+        trip_id: fromTrip.id || prev.trip_id,
+        driver_id: fromTrip.driver_id || prev.driver_id,
       }));
+      
+      if (fromTrip?.vehicle && !selectedVehicle) {
+        setSelectedVehicle(fromTrip.vehicle);
+      }
     }
   }, [fromTrip]);
 
@@ -190,8 +230,8 @@ export default function DriverMaintenanceChecklist() {
   // Transform checklist items to API format and detect issues
   const prepareInspectionData = () => {
     const items = formData.checklist_items.map((item) => ({
-      item_name: item.name,
-      status: item.is_spoilt ? 'fail' : 'ok',
+      name: item.name,
+      checked: item.checked || item.is_spoilt,
       notes: item.notes || '',
     }));
 
@@ -212,6 +252,14 @@ export default function DriverMaintenanceChecklist() {
       
       if (spoiltItems.length === 0) return { success: true, issueCount: 0 };
 
+      // Verify driver_id is available
+      if (!formData.driver_id) {
+        console.warn('⚠️  WARNING: driver_id is null/undefined!');
+        console.warn('   formData:', formData);
+        console.warn('   Trip has driver_id?', !!fromTrip?.driver_id);
+        console.log('   Attempting to find driver...');
+      }
+
       const issuesCreated = [];
       
       for (const item of spoiltItems) {
@@ -219,6 +267,7 @@ export default function DriverMaintenanceChecklist() {
           const issueData = {
             vehicle_id: formData.vehicle_id,
             trip_id: formData.trip_id,
+            driver_id: formData.driver_id,
             title: `🔴 Pre-Trip Inspection Issue: ${item.name}`,
             description: `Driver reported ${item.name} is spoilt/damaged during pre-trip inspection.${item.notes ? `\n\nDriver Notes: ${item.notes}` : ''}`,
             severity: 'high',
@@ -228,10 +277,15 @@ export default function DriverMaintenanceChecklist() {
             inspection_id: inspectionId,
           };
           
+          console.log('📝 Creating issue with payload:', issueData);
+          console.log('   driver_id in payload:', issueData.driver_id);
+          console.log('   trip_id in payload:', issueData.trip_id);
+          
           const response = await api.createIssue(issueData);
           if (response.data?.id) {
             issuesCreated.push(response.data);
             console.log('✓ Issue created:', response.data.id);
+            console.log('   Backend returned - driver_id:', response.data.driver_id, 'trip_id:', response.data.trip_id);
           }
         } catch (issueErr) {
           console.error(`Failed to create issue for ${item.name}:`, issueErr);
@@ -286,7 +340,7 @@ export default function DriverMaintenanceChecklist() {
         trip_id: formData.trip_id,
         inspection_date: new Date().toISOString().split('T')[0],
         notes: formData.notes || 'Pre-trip vehicle inspection completed',
-        items: items,
+        checklist_items: items,
         result: hasFailures ? 'fail' : 'pass',
         status: hasFailures ? 'failed' : 'passed',
       };
@@ -320,18 +374,10 @@ export default function DriverMaintenanceChecklist() {
         failureCount: spoiltItems.length,
         issuesReported: issueReportResult.issueCount,
         vehicleInfo: selectedVehicle || fromTrip?.vehicle,
+        spoiltItems: spoiltItems,
       };
       setCompletionDetails(completionInfo);
-
-      // Build success message
-      let successMsg = '✓ Vehicle inspection completed successfully!';
-      if (hasFailures) {
-        successMsg += `\n⚠ ${spoiltItems.length} issue(s) found and reported to your company admin.`;
-        successMsg += `\n📋 Issues created: ${issueReportResult.issueCount}`;
-      }
-      successMsg += '\n🚗 Redirecting to trip overview...';
-      
-      setSuccess(successMsg);
+      setShowCompletionModal(true);
 
       // Reset form
       setFormData({
@@ -342,25 +388,6 @@ export default function DriverMaintenanceChecklist() {
       });
       setSelectedImage(null);
       setImagePreview('');
-
-      // Redirect after 2.5 seconds
-      setTimeout(() => {
-        if (fromTrip) {
-          // Return to trip overview/map with completion context
-          navigate('/driver/dashboard', { 
-            state: { 
-              selectedTrip: fromTrip,
-              inspectionCompleted: true,
-              inspectionStatus: hasFailures ? 'completed_with_issues' : 'passed',
-              successMessage: hasFailures 
-                ? `Vehicle inspected with ${spoiltItems.length} issue(s). Issues reported to admin.`
-                : 'Vehicle pre-trip inspection passed! Ready to proceed.'
-            }
-          });
-        } else {
-          navigate('/driver/dashboard');
-        }
-      }, 2500);
     } catch (err) {
       console.error('Inspection submission error:', err);
       setError(
@@ -379,6 +406,42 @@ export default function DriverMaintenanceChecklist() {
   const totalItems = formData.checklist_items.length;
   const completionPercentage = totalItems > 0 ? Math.round((checkedCount / totalItems) * 100) : 0;
   const spoiltItemsCount = formData.checklist_items.filter(item => item.is_spoilt).length;
+
+  const handleCompletionModalClose = () => {
+    setShowCompletionModal(false);
+    
+    if (completionDetails?.hasFailures) {
+      // Redirect to dashboard if issues detected
+      navigate('/driver/dashboard', { 
+        state: { 
+          inspectionCompleted: true,
+          inspectionStatus: 'completed_with_issues',
+          successMessage: `Vehicle inspected with ${completionDetails.failureCount} issue(s). Issues reported to admin.`
+        }
+      });
+    } else {
+      // Inspection passed - go directly to trip details/map to start trip
+      if (fromTrip?.id) {
+        navigate(`/driver/trip/${fromTrip.id}`, { 
+          state: { 
+            inspectionCompleted: true,
+            inspectionStatus: 'passed',
+            successMessage: 'Vehicle pre-trip inspection passed! Ready to start trip.',
+            tripData: fromTrip
+          }
+        });
+      } else {
+        // Fallback to dashboard if no trip info
+        navigate('/driver/dashboard', { 
+          state: { 
+            inspectionCompleted: true,
+            inspectionStatus: 'passed',
+            successMessage: 'Vehicle pre-trip inspection passed! Ready to proceed.'
+          }
+        });
+      }
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 py-8 px-4">
@@ -777,6 +840,76 @@ export default function DriverMaintenanceChecklist() {
             )}
           </ul>
         </div>
+
+        {/* Completion Modal */}
+        {showCompletionModal && completionDetails && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className={`bg-white rounded-xl shadow-2xl max-w-md w-full p-8 ${
+              completionDetails.hasFailures ? 'border-l-4 border-red-500' : 'border-l-4 border-green-500'
+            }`}>
+              {/* Modal Icon & Title */}
+              <div className="text-center mb-6">
+                {completionDetails.hasFailures ? (
+                  <>
+                    <div className="text-5xl mb-4">⚠️</div>
+                    <h2 className="text-2xl font-bold text-red-700">Vehicle Issues Detected</h2>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-5xl mb-4">✅</div>
+                    <h2 className="text-2xl font-bold text-green-700">Inspection Passed!</h2>
+                  </>
+                )}
+              </div>
+
+              {/* Modal Content */}
+              {completionDetails.hasFailures ? (
+                <div className="space-y-4">
+                  <p className="text-gray-700">
+                    Your vehicle has <strong className="text-red-600">{completionDetails.failureCount} issue(s)</strong> that need to be fixed:
+                  </p>
+                  <ul className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-2">
+                    {completionDetails.spoiltItems.map((item, idx) => (
+                      <li key={idx} className="text-sm text-red-800">
+                        <strong>• {item.name}</strong>
+                        {item.notes && <p className="text-xs text-red-700 ml-4">{item.notes}</p>}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-gray-600 text-sm">
+                    ⏳ Your company admin will work on fixing these issues and assign you a new vehicle.
+                  </p>
+                  <p className="text-gray-600 text-sm">
+                    📩 You'll receive a notification once a new vehicle is ready. Then you can proceed with your trip!
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-gray-700">
+                    ✓ Your vehicle has passed all inspections and is ready for your trip.
+                  </p>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p className="text-sm text-green-800 font-semibold">
+                      🚗 You can now proceed with your trip!
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal Button */}
+              <button
+                onClick={handleCompletionModalClose}
+                className={`w-full mt-6 px-6 py-3 rounded-lg font-semibold text-white transition ${
+                  completionDetails.hasFailures
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-green-600 hover:bg-green-700'
+                }`}
+              >
+                {completionDetails.hasFailures ? 'Return to Dashboard' : 'Start Trip'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

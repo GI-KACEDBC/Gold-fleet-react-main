@@ -119,6 +119,8 @@ export default function DriverDashboard() {
   const [successMessage, setSuccessMessage] = useState(null);
   const [activeTab, setActiveTab] = useState('trips'); // trips, overview, trip, maintenance
   const [assignedTrips, setAssignedTrips] = useState([]);
+  const [vehicleReassignments, setVehicleReassignments] = useState({});
+  const [reassignmentNotification, setReassignmentNotification] = useState(null);
   const [windowSize, setWindowSize] = useState({
     width: typeof window !== 'undefined' ? window.innerWidth : 0,
     height: typeof window !== 'undefined' ? window.innerHeight : 0,
@@ -230,18 +232,53 @@ export default function DriverDashboard() {
 
         // Get all trips and find active ones for this driver
         const tripsResponse = await api.getTrips();
-        const trips = tripsResponse.data || tripsResponse;
+        let trips = tripsResponse.data || tripsResponse;
+        
+        console.log('📥 Trips fetched from API:', trips.map(t => ({
+          id: t.id,
+          vehicle_id: t.vehicle_id,
+          vehicle: t.vehicle,
+          status: t.status
+        })));
         
         // Filter to get today and future trips only (assigned trips inbox)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const assignedTripsList = Array.isArray(trips) 
+        let assignedTripsList = Array.isArray(trips) 
           ? trips.filter(trip => {
               const tripDate = new Date(trip.date || trip.created_at);
               tripDate.setHours(0, 0, 0, 0);
               return tripDate >= today && trip.status !== 'completed';
             })
           : [];
+        
+        // For each trip, ensure vehicle data is loaded (in case API doesn't include it)
+        const enrichedTrips = await Promise.all(
+          assignedTripsList.map(async (trip) => {
+            if (trip.vehicle_id && !trip.vehicle) {
+              try {
+                const vehicleResponse = await api.getVehicle(trip.vehicle_id);
+                return {
+                  ...trip,
+                  vehicle: vehicleResponse.data || vehicleResponse
+                };
+              } catch (err) {
+                console.warn(`Could not fetch vehicle ${trip.vehicle_id}:`, err);
+                return trip;
+              }
+            }
+            return trip;
+          })
+        );
+        
+        assignedTripsList = enrichedTrips;
+        
+        console.log('🚗 Enriched trips with vehicles:', assignedTripsList.map(t => ({
+          id: t.id,
+          vehicle_id: t.vehicle_id,
+          vehicle: t.vehicle?.make + ' ' + t.vehicle?.model,
+          status: t.status
+        })));
         
         setAssignedTrips(assignedTripsList);
         
@@ -250,6 +287,62 @@ export default function DriverDashboard() {
                           assignedTripsList.find(trip => trip.status === 'pending') ||
                           null;
         setCurrentTrip(activeTrip);
+
+        // Check for vehicle reassignments from admin
+        const reassignmentsFromStorage = JSON.parse(localStorage.getItem('vehicleReassignments') || '[]');
+        const reassignmentMap = {};
+        const reassignmentNotifs = [];
+        
+        console.log('📋 Checking reassignments from storage:', reassignmentsFromStorage);
+        
+        reassignmentsFromStorage.forEach(reassignment => {
+          if (reassignment.tripId) {
+            reassignmentMap[reassignment.tripId] = reassignment;
+            console.log(`  Trip ${reassignment.tripId}: Vehicle reassigned to ${reassignment.newVehicle?.make} ${reassignment.newVehicle?.model}`);
+            
+            // Check if this trip wasn't already notified about
+            const notificationKey = `reassignment-notified-${reassignment.tripId}-${reassignment.newVehicleId}`;
+            if (!localStorage.getItem(notificationKey)) {
+              reassignmentNotifs.push(reassignment);
+              localStorage.setItem(notificationKey, 'true');
+              console.log(`  ✅ Notification queued for Trip ${reassignment.tripId}`);
+            } else {
+              console.log(`  ℹ️  Trip ${reassignment.tripId} already notified`);
+            }
+          }
+        });
+        
+        setVehicleReassignments(reassignmentMap);
+        
+        // Mark trips as reassigned based on localStorage, but vehicle data comes from API
+        const markedTrips = assignedTripsList.map(trip => {
+          const isReassigned = !!reassignmentMap[trip.id];
+          if (isReassigned) {
+            console.log(`🚗 Marking trip ${trip.id} as reassigned (API vehicle: ${trip.vehicle?.make} ${trip.vehicle?.model})`);
+            return {
+              ...trip,
+              reassigned: true,
+            };
+          }
+          return trip;
+        });
+        
+        setAssignedTrips(markedTrips);
+        
+        // Show notification if there are new reassignments
+        if (reassignmentNotifs.length > 0) {
+          const firstReassignment = reassignmentNotifs[0];
+          const tripData = markedTrips.find(t => t.id === firstReassignment.tripId);
+          console.log(`📢 Showing notification for reassignment`, firstReassignment);
+          console.log(`   Trip data from API:`, tripData?.vehicle);
+          setReassignmentNotification({
+            tripId: firstReassignment.tripId,
+            newVehicle: tripData?.vehicle || firstReassignment.newVehicle,
+            message: `✅ New vehicle assigned! ${tripData?.vehicle?.make || firstReassignment.newVehicle?.make} ${tripData?.vehicle?.model || firstReassignment.newVehicle?.model} (${tripData?.vehicle?.license_plate || firstReassignment.newVehicle?.license_plate}) is ready. Please complete a new inspection before proceeding.`,
+          });
+        } else {
+          console.log('ℹ️  No new reassignments to notify');
+        }
 
         // Fetch messages (notifications)
         fetchMessages();
@@ -286,6 +379,119 @@ export default function DriverDashboard() {
 
     fetchTripVehicle();
   }, [currentTrip]);
+
+  // Listen for localStorage changes (admin reassignments) and refresh dashboard
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'vehicleReassignments') {
+        console.log('🔔 Storage change detected! Vehicle reassignments updated');
+        console.log('   New value:', e.newValue);
+        
+        // Immediately fetch fresh trip data to reflect reassignment
+        const fetchUpdatedTrips = async () => {
+          try {
+            const tripsResponse = await api.getTrips();
+            let trips = tripsResponse.data || tripsResponse;
+            
+            console.log('🚗 Refreshing trips due to reassignment:', trips.map(t => ({
+              id: t.id,
+              vehicle_id: t.vehicle_id,
+              vehicle: t.vehicle?.make
+            })));
+            
+            // Filter to get today and future trips only
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            let assignedTripsList = Array.isArray(trips) 
+              ? trips.filter(trip => {
+                  const tripDate = new Date(trip.date || trip.created_at);
+                  tripDate.setHours(0, 0, 0, 0);
+                  return tripDate >= today && trip.status !== 'completed';
+                })
+              : [];
+            
+            // Enrich trips with vehicle data
+            const enrichedTrips = await Promise.all(
+              assignedTripsList.map(async (trip) => {
+                if (trip.vehicle_id && !trip.vehicle) {
+                  try {
+                    const vehicleResponse = await api.getVehicle(trip.vehicle_id);
+                    return {
+                      ...trip,
+                      vehicle: vehicleResponse.data || vehicleResponse
+                    };
+                  } catch (err) {
+                    return trip;
+                  }
+                }
+                return trip;
+              })
+            );
+            
+            assignedTripsList = enrichedTrips;
+            setAssignedTrips(assignedTripsList);
+            
+            // Re-check reassignments
+            const reassignmentsFromStorage = JSON.parse(e.newValue || '[]');
+            const reassignmentMap = {};
+            const reassignmentNotifs = [];
+            
+            console.log('📋 Re-checking reassignments after storage update:', reassignmentsFromStorage);
+            
+            reassignmentsFromStorage.forEach(reassignment => {
+              if (reassignment.tripId) {
+                reassignmentMap[reassignment.tripId] = reassignment;
+                
+                const notificationKey = `reassignment-notified-${reassignment.tripId}-${reassignment.newVehicleId}`;
+                if (!localStorage.getItem(notificationKey)) {
+                  reassignmentNotifs.push(reassignment);
+                  localStorage.setItem(notificationKey, 'true');
+                  console.log(`  ✅ New reassignment notification for Trip ${reassignment.tripId}`);
+                }
+              }
+            });
+            
+            setVehicleReassignments(reassignmentMap);
+            
+            // Mark reassigned trips
+            const markedTrips = assignedTripsList.map(trip => {
+              if (reassignmentMap[trip.id]) {
+                console.log(`✅ Trip ${trip.id} updated with new vehicle: ${trip.vehicle?.make} ${trip.vehicle?.model}`);
+                return {
+                  ...trip,
+                  reassigned: true,
+                };
+              }
+              return trip;
+            });
+            
+            setAssignedTrips(markedTrips);
+            
+            // Show new notification if any
+            if (reassignmentNotifs.length > 0) {
+              const firstReassignment = reassignmentNotifs[0];
+              const tripData = markedTrips.find(t => t.id === firstReassignment.tripId);
+              console.log(`📢 Showing reassignment notification for Trip ${firstReassignment.tripId}`);
+              setReassignmentNotification({
+                tripId: firstReassignment.tripId,
+                newVehicle: tripData?.vehicle || firstReassignment.newVehicle,
+                message: `✅ New vehicle assigned! ${tripData?.vehicle?.make || firstReassignment.newVehicle?.make} ${tripData?.vehicle?.model || firstReassignment.newVehicle?.model} (${tripData?.vehicle?.license_plate || firstReassignment.newVehicle?.license_plate}) is ready. Please complete a new inspection before proceeding.`,
+              });
+            }
+          } catch (err) {
+            console.error('Error refreshing trips after reassignment:', err);
+          }
+        };
+        
+        fetchUpdatedTrips();
+      }
+    };
+    
+    // Listen for storage changes from other tabs/windows or same window
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // Fetch messages/notifications
   const fetchMessages = async () => {
@@ -787,14 +993,61 @@ export default function DriverDashboard() {
           {/* Main Content Area - Map */}
           <div className="lg:col-span-2">
             {activeTab === 'trips' && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 p-3 sm:p-4">
-                  <h2 className="text-lg sm:text-xl font-semibold flex items-center text-gray-900 gap-2">
-                    <FaClipboardList className="text-blue-600 flex-shrink-0" />
-                    <span className="truncate">Assigned Trips Inbox</span>
-                  </h2>
-                </div>
-                
+              <div className="space-y-4">
+                {/* Vehicle Reassignment Notification */}
+                {reassignmentNotification && (
+                  <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4 sm:p-6">
+                    <div className="flex items-start gap-3 sm:gap-4">
+                      <div className="text-3xl flex-shrink-0">✅</div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-green-900 text-base sm:text-lg mb-1">
+                          New Vehicle Assigned!
+                        </h3>
+                        <p className="text-green-800 text-sm sm:text-base mb-3">
+                          {reassignmentNotification.message}
+                        </p>
+                        <div className="bg-white rounded p-3 mb-3 border border-green-200">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-gray-900">{reassignmentNotification.newVehicle?.make} {reassignmentNotification.newVehicle?.model}</span>
+                            <span className="text-gray-600 font-mono text-sm">{reassignmentNotification.newVehicle?.license_plate}</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const trip = assignedTrips.find(t => t.id === reassignmentNotification.tripId);
+                            if (trip) {
+                              navigate('/driver/maintenance', {
+                                state: {
+                                  fromTrip: trip,
+                                  vehicleId: trip.vehicle_id,
+                                  tripId: trip.id
+                                }
+                              });
+                            }
+                          }}
+                          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-medium text-sm transition"
+                        >
+                          Do Inspection Now →
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => setReassignmentNotification(null)}
+                        className="text-green-600 hover:text-green-900 text-xl flex-shrink-0"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Trips List */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 p-3 sm:p-4">
+                    <h2 className="text-lg sm:text-xl font-semibold flex items-center text-gray-900 gap-2">
+                      <FaClipboardList className="text-blue-600 flex-shrink-0" />
+                      <span className="truncate">Assigned Trips Inbox</span>
+                    </h2>
+                  </div>
                 {assignedTrips.length === 0 ? (
                   <div className="p-6 sm:p-8 text-center">
                     <div className="text-gray-400 text-4xl mb-3">📭</div>
@@ -834,6 +1087,11 @@ export default function DriverDashboard() {
                               }`}>
                                 {trip.status}
                               </span>
+                              {trip.reassigned && (
+                                <span className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 whitespace-nowrap">
+                                  🔄 Reassigned
+                                </span>
+                              )}
                             </div>
                             
                             <div className="space-y-2 text-xs sm:text-sm text-gray-600">
@@ -856,6 +1114,14 @@ export default function DriverDashboard() {
                                   Estimated: {trip.distance} km
                                 </p>
                               )}
+                              {trip.vehicle && (
+                                <p className={`flex items-center gap-2 font-semibold ${
+                                  trip.reassigned ? 'text-blue-700' : 'text-gray-700'
+                                }`}>
+                                  🚗 {trip.vehicle.make} {trip.vehicle.model} ({trip.vehicle.license_plate})
+                                  {trip.reassigned && <span className="text-xs ml-1">(New)</span>}
+                                </p>
+                              )}
                             </div>
                           </div>
                           
@@ -868,6 +1134,7 @@ export default function DriverDashboard() {
                   </div>
                 )}
               </div>
+            </div>
             )}
 
             {activeTab === 'overview' && (

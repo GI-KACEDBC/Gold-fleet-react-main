@@ -45,10 +45,20 @@ class IssueController extends Controller
                 'status' => 'nullable|in:open,in_progress,resolved,closed',
                 'reported_date' => 'nullable|date',
                 'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
+                'driver_id' => 'nullable|exists:drivers,id',
+                'trip_id' => 'nullable|exists:trips,id',
             ]);
 
             $validated['company_id'] = auth()->user()->company_id ?? 1;
-            $validated['driver_id'] = auth()->user()->driver_id ?? null;
+            
+            // If driver_id not provided in request, use authenticated user's driver_id
+            if (!isset($validated['driver_id']) || $validated['driver_id'] === null) {
+                $validated['driver_id'] = auth()->user()->driver_id ?? null;
+            }
+            
+            // trip_id comes from request or remains null
+            // (already handled by validation rules)
+            
             $validated['severity'] = $validated['priority'] ?? 'medium';
             $validated['status'] = $validated['status'] ?? 'open';
             $validated['reported_date'] = $validated['reported_date'] ?? now();
@@ -60,6 +70,15 @@ class IssueController extends Controller
             }
 
             $issue = Issue::create($validated);
+
+            // Log what was saved
+            \Log::info('Issue created:', [
+                'issue_id' => $issue->id,
+                'vehicle_id' => $issue->vehicle_id,
+                'driver_id' => $issue->driver_id,
+                'trip_id' => $issue->trip_id ?? 'NULL',
+                'title' => $issue->title,
+            ]);
 
             // Notify admin/company manager
             $this->notifyAdmins($issue);
