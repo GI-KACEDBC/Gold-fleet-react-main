@@ -1,295 +1,582 @@
-# Gold Fleet - Restructured Architecture
+# Gold Fleet Management System
 
-This project has been restructured into a modern separated architecture with a React frontend and Laravel API backend.
+A comprehensive fleet management application built with modern technologies. This system enables teams to efficiently manage vehicles, drivers, trips, services, inspections, and maintenance workflows across their fleet operations.
 
-## Project Structure
+---
+
+## 🚀 Quick Start (5 Minutes)
+
+Get the entire application running with these simple steps:
+
+### Prerequisites
+- **Node.js** 16+ and **npm** installed
+- **PHP** 8.2+ and **Composer** installed
+- **PostgreSQL** 12+ running and accessible
+- **Git** for cloning repositories
+
+### 1. Clone & Setup Backend
+```bash
+cd backend
+composer setup
+```
+
+This single command will:
+- ✅ Install PHP dependencies
+- ✅ Copy environment configuration
+- ✅ Generate application key
+- ✅ Create database and run migrations
+- ✅ Seed test data (optional)
+- ✅ Create storage symlink (for file uploads)
+- ✅ Install and build frontend assets
+
+### 2. Start Development Environment
+Open **two separate terminals**:
+
+**Terminal 1 - Backend (Laravel API)**
+```bash
+cd backend
+composer dev
+```
+This starts the Laravel server, queue listener, logs, and Vite watcher concurrently.
+
+**Terminal 2 - Frontend (React)**
+```bash
+cd frontend
+npm run dev
+```
+
+### 3. Access the Application
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:8000
+- **Default Admin Login**: (Check seeded test data in backend)
+
+---
+
+## 📋 Table of Contents
+
+1. [Project Structure](#project-structure)
+2. [Technology Stack](#technology-stack)
+3. [Installation & Setup](#installation--setup)
+4. [Running the Application](#running-the-application)
+5. [Project Architecture](#project-architecture)
+6. [Key Features](#key-features)
+7. [Database Configuration](#database-configuration)
+8. [API Endpoints](#api-endpoints)
+9. [Development Workflow](#development-workflow)
+10. [Troubleshooting](#troubleshooting)
+11. [Contributing Guidelines](#contributing-guidelines)
+12. [Documentation Links](#documentation-links)
+
+---
+
+## 📁 Project Structure
 
 ```
-gold-fleet/
-├── backend/          # Laravel API
-│   ├── app/
-│   ├── routes/
-│   ├── config/
-│   ├── database/
-│   ├── resources/    # Keep for reference during dev
-│   ├── public/
-│   ├── composer.json
-│   └── artisan
+gold-fleet-react-main/
+├── 📂 backend/                 # Laravel 12 API Server
+│   ├── app/                    # Application logic (Controllers, Models, Services)
+│   ├── database/               # Migrations and seeders
+│   ├── routes/                 # API route definitions
+│   ├── config/                 # Configuration files
+│   ├── storage/                # File uploads and cache
+│   ├── public/                 # Public assets
+│   ├── .env.example            # Environment template
+│   ├── composer.json           # PHP dependencies
+│   ├── setup.bat               # Windows automated setup
+│   └── setup.sh                # Linux/Mac automated setup
 │
-└── frontend/         # React + Vite
-    ├── src/
-    │   ├── components/  # Reusable components
-    │   ├── pages/      # Page components
-    │   ├── services/   # API services
-    │   ├── assets/     # Images, videos, icons
-    │   ├── App.jsx
-    │   └── main.jsx
-    ├── package.json
-    ├── vite.config.js
-    └── index.html
+├── 📂 frontend/                # React 19 + Vite Application
+│   ├── src/
+│   │   ├── components/         # Reusable React components
+│   │   ├── pages/              # Page-level components
+│   │   ├── services/           # API client and service layer
+│   │   ├── assets/             # Images, icons, styles
+│   │   ├── App.jsx             # Root component
+│   │   └── main.jsx            # Application entry point
+│   ├── package.json            # Node.js dependencies
+│   ├── vite.config.js          # Vite configuration
+│   ├── tailwind.config.cjs     # Tailwind CSS configuration
+│   └── eslintrc.config.js      # ESLint rules
+│
+└── 📄 This README              # Project overview
 ```
 
-## Setup Instructions
+---
 
-### Backend (Laravel API)
+## 🛠 Technology Stack
 
-1. Navigate to the backend directory:
+### Frontend
+| Technology | Version | Purpose |
+|-----------|---------|----------|
+| **React** | 19.2.0 | UI framework |
+| **Vite** | 7.2.4 | Build tool and dev server |
+| **React Router** | 7.13.0 | Client-side routing |
+| **Tailwind CSS** | 3.4.1 | Utility-first CSS styling |
+| **Axios** | 1.13.4 | HTTP client for API calls |
+| **Leaflet** | 1.9.4 | Interactive maps |
+| **Chart.js** | 4.5.1 | Data visualization |
+| **Recharts** | 3.7.0 | React charting library |
+| **ESLint** | 9.39.1 | Code quality and linting |
+
+### Backend
+| Technology | Version | Purpose |
+|-----------|---------|----------|
+| **Laravel** | 12.0 | Web framework |
+| **PHP** | 8.2+ | Server-side language |
+| **PostgreSQL** | 12+ | Primary database |
+| **Sanctum** | (built-in) | SPA authentication |
+| **Composer** | Latest | PHP dependency manager |
+| **Pest PHP** | 4.2 | Testing framework |
+
+---
+
+## 📦 Installation & Setup
+
+### Option 1: Automated Setup (Recommended)
+
+#### Windows
+```bash
+cd backend
+setup.bat
+```
+
+#### Linux/Mac
+```bash
+cd backend
+chmod +x setup.sh
+./setup.sh
+```
+
+### Option 2: Manual Setup
+
+#### Step 1: Backend Setup
+```bash
+cd backend
+
+# Copy environment file
+cp .env.example .env
+
+# Install PHP dependencies
+composer install
+
+# Generate application key
+php artisan key:generate
+
+# Configure database in .env (see Database Configuration section below)
+
+# Run database migrations
+php artisan migrate
+
+# Create storage symlink (required for file uploads)
+php artisan storage:link
+
+# Seed test data (optional - for development)
+php artisan db:seed
+
+# Return to root
+cd ..
+```
+
+#### Step 2: Frontend Setup
+```bash
+cd frontend
+
+# Install Node.js dependencies
+npm install
+
+# Return to root
+cd ..
+```
+
+---
+
+## 🎯 Running the Application
+
+### Full Stack Development (All Services)
+
+**Option 1: Using Composer (Backend Only)**
+```bash
+cd backend
+composer dev
+```
+This runs all services concurrently:
+- Laravel API server
+- Queue listener
+- Application logs
+- Frontend Vite watcher (npm run dev)
+
+**Option 2: Manual (Separate Terminals)**
+
+Open **Terminal 1** in the `backend` folder:
+```bash
+composer dev
+# OR manually:
+php artisan serve              # Starts Laravel at http://localhost:8000
+```
+
+Open **Terminal 2** in the `frontend` folder:
+```bash
+npm run dev                     # Starts React dev server at http://localhost:5173
+```
+
+### Frontend Only
+```bash
+cd frontend
+npm run dev
+```
+Access at: http://localhost:5173
+
+### Backend Only
+```bash
+cd backend
+php artisan serve
+```
+Access API at: http://localhost:8000/api
+
+### Production Build
+```bash
+# Build frontend
+cd frontend
+npm run build                  # Creates dist/ folder
+
+# Build backend (Laravel auto-serves from frontend/dist)
+cd ../backend
+php artisan optimize          # Optimize for production
+```
+
+---
+
+## 🏗 Project Architecture
+
+### Frontend-Backend Communication
+
+The frontend and backend communicate over HTTP using a REST API architecture:
+
+```
+Frontend (React)
+   ↓ Axios HTTP Requests
+   ↓ (http://localhost:8000/api)
+Backend (Laravel)
+   ↓ API Routes
+   ↓ Controllers & Services
+   ↓
+Database (PostgreSQL)
+```
+
+### Authentication Flow (Sanctum SPA)
+
+1. User logs in via frontend
+2. Backend issues a session cookie (Sanctum)
+3. Subsequent requests include the cookie automatically
+4. Backend validates session and returns user data
+
+**Key Configuration** (in `backend/.env`):
+```
+SANCTUM_STATEFUL_DOMAINS=localhost:5173
+SESSION_DOMAIN=localhost
+```
+
+### Key Modules
+
+| Module | Purpose | Key Files |
+|--------|---------|----------|
+| **Vehicles** | Fleet vehicle management | `app/Models/Vehicle.php`, `routes/api.php` |
+| **Drivers** | Driver profiles and status | `app/Models/Driver.php` |
+| **Trips** | Trip tracking and logging | `app/Models/Trip.php` |
+| **Services** | Maintenance and service records | `app/Models/Service.php` |
+| **Inspections** | Vehicle inspection workflows | `app/Models/Inspection.php` |
+| **Dashboard** | Analytics and overview | `frontend/src/pages/Dashboard.jsx` |
+| **Messaging** | Inter-user communication | `app/Models/Message.php` |
+| **Authentication** | User login and authorization | `app/Models/User.php`, Sanctum |
+
+---
+
+## ✨ Key Features
+
+### Fleet Management
+- ✅ **Vehicle Registry** - Track all vehicles with detailed specifications
+- ✅ **Driver Management** - Driver profiles, licenses, and certifications
+- ✅ **Trip Tracking** - Log trips, routes, and distances
+- ✅ **Service Records** - Maintenance history and scheduling
+
+### Operations
+- ✅ **Real-time Dashboard** - Fleet overview with analytics
+- ✅ **Map View** - Interactive vehicle location mapping (Leaflet.js)
+- ✅ **Inspection Workflows** - Pre-trip and post-trip inspections
+- ✅ **Issue Tracking** - Report and manage fleet issues
+
+### Communications
+- ✅ **Driver Messaging** - Internal communication system
+- ✅ **Notifications** - Real-time alerts for important events
+- ✅ **Email Verification** - Secure user authentication
+
+### Analytics
+- ✅ **Charts & Reports** - Multiple visualization options (Charts.js, Recharts)
+- ✅ **Performance Metrics** - Fuel consumption, trip efficiency
+- ✅ **Export Capabilities** - Download reports and data
+
+---
+
+## 🗄 Database Configuration
+
+### Setup Requirements
+
+**PostgreSQL** must be installed and running before migrations.
+
+### Configuration (backend/.env)
+
+```env
+# Database Connection
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=Gold_Fleet
+DB_USERNAME=postgres
+DB_PASSWORD=Christian12345@      # Change this in production!
+
+# Session & Authentication
+SESSION_DOMAIN=localhost
+SESSION_DRIVER=database
+SANCTUM_STATEFUL_DOMAINS=localhost:5173
+```
+
+### Create Database
+
+PostgreSQL will **automatically create the database** during `php artisan migrate`, or manually:
+
+```bash
+psql -U postgres -c "CREATE DATABASE Gold_Fleet;"
+```
+
+### Run Migrations
+
+```bash
+cd backend
+php artisan migrate              # Create all tables
+php artisan migrate:fresh        # Reset database (development only)
+php artisan db:seed              # Seed test data
+```
+
+### View Database Tables
+
+```bash
+psql -U postgres -d Gold_Fleet
+\dt                              # List all tables
+\q                               # Exit psql
+```
+
+---
+
+## 🔌 API Endpoints
+
+All endpoints are prefixed with `/api`.
+
+### Authentication
+```
+POST   /api/login                 # User login
+POST   /api/logout                # User logout
+POST   /api/signup                # New user registration
+GET    /api/user                  # Current user info
+```
+
+### Vehicles
+```
+GET    /api/vehicles              # List all vehicles
+POST   /api/vehicles              # Create new vehicle
+GET    /api/vehicles/{id}         # Get vehicle details
+PUT    /api/vehicles/{id}         # Update vehicle
+DELETE /api/vehicles/{id}         # Delete vehicle
+```
+
+### Drivers
+```
+GET    /api/drivers               # List all drivers
+POST   /api/drivers               # Create new driver
+GET    /api/drivers/{id}          # Get driver details
+PUT    /api/drivers/{id}          # Update driver
+DELETE /api/drivers/{id}          # Delete driver
+```
+
+### Trips
+```
+GET    /api/trips                 # List all trips
+POST   /api/trips                 # Create new trip
+GET    /api/trips/{id}            # Get trip details
+PUT    /api/trips/{id}            # Update trip
+DELETE /api/trips/{id}            # Delete trip
+```
+
+### Dashboard & Analytics
+```
+GET    /api/dashboard             # Dashboard summary data
+GET    /api/analytics/vehicles    # Vehicle analytics
+GET    /api/analytics/drivers     # Driver analytics
+GET    /api/analytics/trips       # Trip analytics
+```
+
+See [backend/README.md](backend/README.md) for complete API documentation.
+
+---
+
+## 💻 Development Workflow
+
+### Daily Development Routine
+
+1. **Start backend services** (Terminal 1):
    ```bash
    cd backend
+   composer dev
    ```
 
-2. Install Laravel dependencies:
-   ```bash
-   composer install
-   ```
-
-3. Configure environment variables:
-   ```bash
-   cp .env.example .env
-   php artisan key:generate
-   ```
-
-4. Setup database:
-   ```bash
-   php artisan migrate
-   php artisan db:seed
-   ```
-
-5. Start the Laravel development server:
-   ```bash
-   php artisan serve
-   ```
-   Laravel will run on `http://localhost:8000`
-
-### Frontend (React + Vite)
-
-1. Navigate to the frontend directory:
+2. **Start frontend dev server** (Terminal 2):
    ```bash
    cd frontend
-   ```
-
-2. Install npm dependencies (already done):
-   ```bash
-   npm install
-   ```
-
-3. Start the development server:
-   ```bash
    npm run dev
    ```
-   React will run on `http://localhost:5173`
 
-## API Endpoints
+3. **Open in browser**: http://localhost:5173
 
-The frontend communicates with the Laravel backend API at `http://localhost:8000/api`.
+4. **Make code changes** - React hot-reloads automatically, Laravel logs appear in Terminal 1
 
-### Key Routes
+5. **Stop services** - Press `Ctrl+C` in each terminal
 
-- **Vehicles**: `/api/vehicles`
-- **Drivers**: `/api/drivers`
-- **Trips**: `/api/trips`
-- **Services**: `/api/services`
-- **Inspections**: `/api/inspections`
-- **Issues**: `/api/issues`
-- **Expenses**: `/api/expenses`
-- **Fuel Fillups**: `/api/fuel-fillups`
-- **Reminders**: `/api/reminders`
-- **Dashboard**: `/api/dashboard`
-- **Notifications**: `/api/notifications`
+### Database Changes
 
-## Component Structure
+If you add new features that require database changes:
 
-### Layout Components
-- `Layout.jsx` - Main wrapper with sidebar and header
-- `Sidebar.jsx` - Navigation menu
-- `Header.jsx` - Top bar with notifications and profile
+```bash
+# Create a new migration
+php artisan make:migration create_new_table_name
 
-### Page Components
-All pages are organized by feature:
-- `pages/Dashboard.jsx` - Main dashboard
-- `pages/Vehicles/` - Vehicle CRUD pages
-- `pages/Drivers/` - Driver CRUD pages
-- `pages/Trips/` - Trip CRUD pages
-- And similar structure for Services, Inspections, Issues, Expenses, Fuel Fillups, Reminders
+# Edit database/migrations/YYYY_MM_DD_HHMMSS_create_new_table_name.php
 
-### Styling
-
-The project uses **Tailwind CSS** for styling:
-- All components use Tailwind utility classes
-- Color scheme matches the original Laravel UI (yellow accent #FBBF24)
-- Responsive design with mobile-first approach
-- All CSS classes are applied via Tailwind (no custom CSS except global styles)
-
-## Migration from Blade to React
-
-### Key Patterns Converted
-
-1. **Blade @extends → React Layout Wrapper**
-   ```blade
-   @extends('layouts.app')
-   ```
-   Becomes:
-   ```jsx
-   <Layout><PageComponent /></Layout>
-   ```
-
-2. **Blade @include → React Component Import**
-   ```blade
-   @include('partials.sidebar')
-   ```
-   Becomes:
-   ```jsx
-   import Sidebar from './Sidebar'
-   ```
-
-3. **Blade {{ }} → JSX { }**
-   ```blade
-   {{ $variable }}
-   ```
-   Becomes:
-   ```jsx
-   {variable}
-   ```
-
-4. **Blade @if/@foreach → JS Conditionals/Map**
-   ```blade
-   @foreach($items as $item)
-     {{ $item->name }}
-   @endforeach
-   ```
-   Becomes:
-   ```jsx
-   {items.map(item => <div key={item.id}>{item.name}</div>)}
-   ```
-
-5. **Alpine.js → React Hooks**
-   ```blade
-   x-data="{ open: false }"
-   @click="open = !open"
-   x-show="open"
-   ```
-   Becomes:
-   ```jsx
-   const [open, setOpen] = useState(false);
-   onClick={() => setOpen(!open)}
-   {open && <Component />}
-   ```
-
-6. **Laravel Routes → React Router**
-   ```blade
-   {{ route('vehicles.index') }}
-   ```
-   Becomes:
-   ```jsx
-   <Link to="/vehicles">
-   ```
-
-## API Integration
-
-All API calls are centralized in `src/services/api.js`:
-
-```javascript
-import api from './services/api';
-
-const vehicles = await api.getVehicles();
-const newVehicle = await api.createVehicle(data);
-await api.updateVehicle(id, data);
-await api.deleteVehicle(id);
+# Run the migration
+php artisan migrate
 ```
 
-## Development Workflow
+### Testing
 
-1. **Start both servers:**
-   ```bash
-   # Terminal 1 - Backend
-   cd backend && php artisan serve
-   
-   # Terminal 2 - Frontend
-   cd frontend && npm run dev
-   ```
+```bash
+cd backend
 
-2. **Access the application:**
-   - Frontend: `http://localhost:5173`
-   - Backend API: `http://localhost:8000/api`
-   - Blade pages (reference): `http://localhost:8000`
+# Run all tests
+composer test
 
-3. **Build for production:**
-   ```bash
-   # Frontend
-   cd frontend && npm run build
-   
-   # Backend (standard Laravel)
-   cd backend && php artisan config:cache
-   ```
+# Run specific test file
+php artisan test tests/Feature/VehicleTest.php
 
-## CORS Configuration
-
-If you encounter CORS issues, update `config/cors.php` in the Laravel backend:
-
-```php
-'allowed_origins' => ['http://localhost:5173', 'http://localhost:3000'],
+# Run with coverage
+php artisan test --coverage
 ```
 
-## Assets
+### Code Quality
 
-All images, videos, and icons are stored in:
-- `frontend/src/assets/background-image/`
-- `frontend/src/assets/background-video/`
+```bash
+# Lint frontend code
+cd frontend
+npm run lint
 
-Import them in React components:
-```jsx
-import image from './assets/background-image/image.jpg'
-
-<img src={image} alt="Background" />
+# Fix linting errors (auto)
+npm run lint -- --fix
 ```
 
-## Next Steps
+---
 
-1. **Complete Page Implementations**
-   - Replace stub implementations with full CRUD pages
-   - Add form validation and error handling
-   - Implement pagination and filtering
+## 🐛 Troubleshooting
 
-2. **Charts & Visualizations**
-   - Install `recharts` or `chart.js` wrapper
-   - Implement dashboard charts
-   - Real-time data updates
+### Common Issues & Solutions
 
-3. **Authentication**
-   - Setup React Context or Redux for auth state
-   - Implement login/logout functionality
-   - Add route protection
+#### Issue: "Port 8000 already in use"
+```bash
+# Find process using port 8000
+netstat -ano | findstr :8000                    # Windows
+lsof -i :8000                                    # Mac/Linux
 
-4. **Testing**
-   - Add unit tests (Jest + React Testing Library)
-   - Add integration tests
-   - API testing
+# Kill the process (Windows)
+taskkill /PID <PID> /F
 
-5. **Deployment**
-   - Deploy backend to a production server
-   - Deploy frontend to Vercel, Netlify, or similar
-   - Setup CI/CD pipeline
+# Use different port
+php artisan serve --port=8001
+```
 
-## Troubleshooting
+#### Issue: "CORS error: Access-Control-Allow-Origin"
+This typically happens when frontend/backend ports are mismatched.
 
-### API calls returning 404
-- Ensure Laravel is running on `http://localhost:8000`
-- Check that API routes are properly defined in `backend/routes/api.php`
-- Verify vite proxy config includes `/api` path
+**Solution**:
+1. Verify frontend is at http://localhost:5173
+2. Verify backend is at http://localhost:8000
+3. Check `backend/.env` has correct SANCTUM_STATEFUL_DOMAINS
+4. Restart both services
 
-### Tailwind styles not showing
-- Ensure vite is watching for changes
-- Check `tailwind.config.js` includes correct paths
-- Clear node_modules and reinstall
+#### Issue: "Storage symlink does not exist" or File Upload Fails
+```bash
+cd backend
+php artisan storage:link
+```
 
-### CORS errors
-- Update Laravel `config/cors.php` to allow frontend URL
-- Ensure `Accept` and `Content-Type` headers are set in API calls
+#### Issue: "SQLSTATE[08006] could not connect to server"
+Database connection failed.
 
-## Resources
+**Solution**:
+1. Ensure PostgreSQL is running
+2. Check connection in `backend/.env`
+3. Verify database exists
+4. Restart PostgreSQL service
 
+#### Issue: "npm: command not found"
+Node.js not installed.
+
+**Solution**:
+1. Download from https://nodejs.org/ (LTS version)
+2. Install and restart terminal
+3. Verify: `node --version` and `npm --version`
+
+#### Issue: 502 Bad Gateway or API not responding
+Backend service crashed.
+
+**Solution**:
+1. Check Terminal 1 for error messages
+2. Restart backend: `Ctrl+C` then `composer dev`
+
+See [Troubleshooting](#troubleshooting) section in each README for more issues.
+
+---
+
+## 👥 Contributing Guidelines
+
+### Code Style
+- **Frontend**: Follow ESLint rules (`npm run lint`)
+- **Backend**: Follow Laravel conventions and PSR-12 standards
+- **Commit Messages**: Use descriptive, present-tense messages
+
+### Workflow
+1. Create feature branch: `git checkout -b feature/my-feature`
+2. Make changes and test thoroughly
+3. Run linting: `npm run lint` (frontend), `composer test` (backend)
+4. Commit changes: `git commit -m "Add new feature"`
+5. Push and create Pull Request
+6. Code review before merge
+
+---
+
+## 📚 Documentation Links
+
+For detailed documentation specific to each part of the system:
+
+- **[Frontend README](frontend/README.md)** - React, Vite, npm scripts, component structure
+- **[Backend README](backend/README.md)** - Laravel, API routes, database, Artisan commands
+
+### Additional Resources
+- [Laravel Documentation](https://laravel.com/docs)
 - [React Documentation](https://react.dev)
-- [Tailwind CSS](https://tailwindcss.com)
 - [Vite Documentation](https://vitejs.dev)
-- [React Router](https://reactrouter.com)
-- [Laravel API Documentation](https://laravel.com/docs/11/eloquent-resources)
+- [Tailwind CSS Documentation](https://tailwindcss.com)
+- [Axios Documentation](https://axios-http.com)
+
+---
+
+## 🎉 Ready to Go!
+
+Your Gold Fleet Management System is now ready for development and deployment. Start with the [Quick Start](#-quick-start-5-minutes) section and refer back to this documentation as needed.
+
+**Happy coding!** 🚀
